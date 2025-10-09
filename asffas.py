@@ -10,4 +10,6 @@ for i in range(n):
 for i in range(n):
     if arr[i]%2==0:
         c+=1
+
+
 print(c)
