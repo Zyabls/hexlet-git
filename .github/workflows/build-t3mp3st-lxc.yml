@@ -1,0 +1,53 @@
+name: Build offline T3MP3ST Proxmox LXC template
+
+on:
+  push:
+    branches:
+      - artifact/t3mp3st-proxmox-lxc-20260803
+    paths:
+      - .github/workflows/build-t3mp3st-lxc.yml
+      - offline-image/**
+      - t3mp3st-proxmox-lxc-afc9dad1-20260803.tar.gz
+      - t3mp3st-proxmox-lxc-afc9dad1-20260803.tar.gz.sha256
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: t3mp3st-offline-lxc
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: t3mp3st-lxc-offline-20260803
+    steps:
+      - name: Clone artifact branch
+        env:
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          git clone --depth 1 --branch "$GITHUB_REF_NAME" "$SOURCE_URL" "$GITHUB_WORKSPACE/src"
+
+      - name: Build and verify rootfs template
+        run: |
+          sudo bash "$GITHUB_WORKSPACE/src/offline-image/build.sh" "$GITHUB_WORKSPACE/out"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$GITHUB_WORKSPACE/src"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$GITHUB_WORKSPACE"/out/* \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/out/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "T3MP3ST offline Proxmox LXC (2026-08-03)" \
+              --notes-file offline-image/RELEASE_NOTES_RU.md
+          fi
+

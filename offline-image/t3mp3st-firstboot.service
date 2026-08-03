@@ -1,0 +1,14 @@
+[Unit]
+Description=Finalize T3MP3ST LXC identity and SSH access
+After=local-fs.target
+Before=ssh.service t3mp3st.service
+ConditionPathExists=!/var/lib/t3mp3st/.firstboot-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/t3mp3st-firstboot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

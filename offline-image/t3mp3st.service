@@ -1,0 +1,33 @@
+[Unit]
+Description=T3MP3ST War Room
+Wants=network-online.target t3mp3st-firstboot.service
+After=network-online.target t3mp3st-firstboot.service
+ConditionPathExists=/opt/t3mp3st/dist/server.js
+
+[Service]
+Type=simple
+User=t3mp3st
+Group=t3mp3st
+WorkingDirectory=/opt/t3mp3st
+EnvironmentFile=/etc/t3mp3st/t3mp3st.env
+ExecStart=/usr/local/bin/node /opt/t3mp3st/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/t3mp3st
+
+[Install]
+WantedBy=multi-user.target
+
