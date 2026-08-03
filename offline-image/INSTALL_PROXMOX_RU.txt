@@ -1,18 +1,26 @@
-T3MP3ST: офлайн-установка готового LXC-шаблона в Proxmox
-================================================================
+T3MP3ST Free AI: офлайн-установка готового LXC-шаблона в Proxmox
+=======================================================================
 
 Внутри уже находятся Debian 12, Node.js 24.16.0, npm-зависимости,
-собранный T3MP3ST и Codex CLI 0.146.0. На узле Proxmox интернет не нужен.
+собранный T3MP3ST, Codex CLI 0.146.0, CPU-only Ollama 0.32.5 и локальная
+Qwen2.5-Coder 1.5B. На узле Proxmox интернет не нужен даже для локальной LLM.
 
 1. Скопируйте файл .tar.zst на узел Proxmox и проверьте SHA-256:
 
-   sha256sum -c t3mp3st-debian12-pve-offline-amd64-afc9dad1.tar.zst.sha256
-   install -m 0644 t3mp3st-debian12-pve-offline-amd64-afc9dad1.tar.zst \
+   Если Release содержит части .part-00, .part-01 и т.д., сначала соберите их:
+
+   cat t3mp3st-freeai-debian12-pve-offline-amd64-afc9dad1.tar.zst.part-* \
+     > t3mp3st-freeai-debian12-pve-offline-amd64-afc9dad1.tar.zst
+
+   Затем проверьте и установите шаблон:
+
+   sha256sum -c t3mp3st-freeai-debian12-pve-offline-amd64-afc9dad1.tar.zst.sha256
+   install -m 0644 t3mp3st-freeai-debian12-pve-offline-amd64-afc9dad1.tar.zst \
      /var/lib/vz/template/cache/
 
 2. Создайте контейнер. Замените 240, хранилища, мост и путь к ключу при необходимости:
 
-   pct create 240 local:vztmpl/t3mp3st-debian12-pve-offline-amd64-afc9dad1.tar.zst \
+   pct create 240 local:vztmpl/t3mp3st-freeai-debian12-pve-offline-amd64-afc9dad1.tar.zst \
      --hostname t3mp3st \
      --unprivileged 1 \
      --cores 4 \
@@ -33,6 +41,8 @@ T3MP3ST: офлайн-установка готового LXC-шаблона в 
    pct exec 240 -- systemctl --no-pager --full status t3mp3st
    pct exec 240 -- /usr/local/bin/node --version
    pct exec 240 -- /usr/local/bin/codex --version
+   pct exec 240 -- /usr/local/bin/ollama list
+   pct exec 240 -- /usr/local/sbin/t3mp3st-free-ai status
 
 4. Веб-интерфейс слушает только 127.0.0.1 контейнера. Откройте SSH-туннель:
 
@@ -44,7 +54,18 @@ T3MP3ST: офлайн-установка готового LXC-шаблона в 
 --ssh-public-keys. Если ключ не передали, добавьте его через pct exec или консоль.
 
 В образ намеренно не включены API-ключи и ~/.codex/auth.json. Авторизацию Codex
-выполняйте приватно после развёртывания. Для установки шаблона интернет не нужен,
-но для обращения к облачной модели Codex контейнеру потребуется разрешённый доступ
-к соответствующему API.
+выполняйте приватно после развёртывания из консоли контейнера:
 
+   sudo t3mp3st-free-ai codex-login
+
+Это вход ChatGPT, а не Platform API key: отдельные API-начисления не создаются,
+но действуют лимиты вашего плана ChatGPT. Полностью автономный режим уже готов:
+
+   sudo t3mp3st-free-ai local
+
+Вернуться на Codex:
+
+   sudo t3mp3st-free-ai codex
+
+Для установки и локальной Qwen интернет не нужен. Для Codex контейнеру потребуется
+доступ к сервисам OpenAI. Все агенты используйте только в разрешённом контуре.

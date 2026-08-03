@@ -15,14 +15,18 @@ T3MP3ST_SHORT="afc9dad1"
 NODE_VERSION="24.16.0"
 NODE_SHA256="d804845d34eddc21dc1092b519d643ef40b1f58ec5dec5c22b1f4bd8fabde6c9"
 CODEX_VERSION="0.146.0"
+OLLAMA_VERSION="0.32.5"
+OLLAMA_SHA256="f7d6bdbcf71b83aa8670c4e7dc4b6936c0952fcf8b114eaf6a11cbadb9684214"
+OLLAMA_MODEL="qwen2.5-coder:1.5b"
 BUNDLE_NAME="t3mp3st-proxmox-lxc-afc9dad1-20260803.tar.gz"
 BUNDLE_SHA256="76328c2d38f9d739a8771955fa9f59c365f0cfffb890a2dd7fe411deb02d71fa"
-IMAGE_NAME="t3mp3st-debian12-pve-offline-amd64-afc9dad1.tar.zst"
+IMAGE_NAME="t3mp3st-freeai-debian12-pve-offline-amd64-afc9dad1.tar.zst"
 
 WORK_DIR="$(mktemp -d -t t3mp3st-lxc-build.XXXXXXXX)"
 ROOTFS="$WORK_DIR/rootfs"
 PAYLOAD_DIR="$WORK_DIR/payload"
 MOUNTS_ACTIVE=0
+OLLAMA_BUILD_PID=""
 
 unmount_chroot() {
   if [[ $MOUNTS_ACTIVE -eq 1 ]]; then
@@ -34,6 +38,10 @@ unmount_chroot() {
 }
 
 cleanup() {
+  if [[ -n "$OLLAMA_BUILD_PID" ]]; then
+    kill "$OLLAMA_BUILD_PID" >/dev/null 2>&1 || true
+    wait "$OLLAMA_BUILD_PID" >/dev/null 2>&1 || true
+  fi
   unmount_chroot
   rm -rf -- "$WORK_DIR"
 }
@@ -158,16 +166,70 @@ chroot "$ROOTFS" /usr/local/bin/node --version
 chroot "$ROOTFS" /usr/local/bin/codex --version
 chroot "$ROOTFS" /usr/local/bin/node --check /opt/t3mp3st/dist/server.js
 
+echo "[6b/9] Installing CPU-only Ollama and an offline local coding model"
+OLLAMA_ARCHIVE="ollama-linux-amd64.tar.zst"
+curl --fail --location --proto '=https' --tlsv1.2 \
+  "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/${OLLAMA_ARCHIVE}" \
+  --output "$WORK_DIR/$OLLAMA_ARCHIVE"
+printf '%s  %s\n' "$OLLAMA_SHA256" "$WORK_DIR/$OLLAMA_ARCHIVE" | sha256sum --check --strict
+tar --use-compress-program=unzstd -xf "$WORK_DIR/$OLLAMA_ARCHIVE" -C "$ROOTFS/usr"
+rm -f "$WORK_DIR/$OLLAMA_ARCHIVE"
+
+# The standard Ollama archive carries large CUDA/ROCm runtimes. This template is
+# intentionally CPU-only so it remains a portable unprivileged LXC image. Keep
+# the CPU ggml libraries and remove accelerator-specific payloads.
+rm -rf \
+  "$ROOTFS/usr/lib/ollama/cuda_"* \
+  "$ROOTFS/usr/lib/ollama/rocm"* \
+  "$ROOTFS/usr/lib/ollama/oneapi"* \
+  "$ROOTFS/usr/lib/ollama/vulkan"*
+[[ -x "$ROOTFS/usr/bin/ollama" ]] || {
+  echo "Ollama binary missing after archive extraction" >&2
+  exit 1
+}
+ln -sfn /usr/bin/ollama "$ROOTFS/usr/local/bin/ollama"
+
+chroot "$ROOTFS" useradd --system --create-home \
+  --home-dir /var/lib/ollama --shell /usr/sbin/nologin ollama
+OLLAMA_UID="$(chroot "$ROOTFS" id -u ollama)"
+OLLAMA_GID="$(chroot "$ROOTFS" id -g ollama)"
+install -d -m 0750 -o "$OLLAMA_UID" -g "$OLLAMA_GID" \
+  "$ROOTFS/var/lib/ollama" "$ROOTFS/var/lib/ollama/models"
+
+chroot "$ROOTFS" /usr/sbin/runuser -u ollama -- \
+  /usr/bin/env HOME=/var/lib/ollama OLLAMA_HOST=127.0.0.1:11434 \
+  OLLAMA_MODELS=/var/lib/ollama/models /usr/local/bin/ollama serve \
+  >"$WORK_DIR/ollama-build.log" 2>&1 &
+OLLAMA_BUILD_PID=$!
+for _ in $(seq 1 60); do
+  curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null 2>&1 && break
+  sleep 1
+done
+curl --fail --silent http://127.0.0.1:11434/api/version
+chroot "$ROOTFS" /usr/sbin/runuser -u ollama -- \
+  /usr/bin/env HOME=/var/lib/ollama OLLAMA_HOST=127.0.0.1:11434 \
+  OLLAMA_MODELS=/var/lib/ollama/models /usr/local/bin/ollama pull "$OLLAMA_MODEL"
+chroot "$ROOTFS" /usr/sbin/runuser -u ollama -- \
+  /usr/bin/env HOME=/var/lib/ollama OLLAMA_HOST=127.0.0.1:11434 \
+  OLLAMA_MODELS=/var/lib/ollama/models /usr/local/bin/ollama list | grep -F "$OLLAMA_MODEL"
+kill "$OLLAMA_BUILD_PID" >/dev/null 2>&1 || true
+wait "$OLLAMA_BUILD_PID" >/dev/null 2>&1 || true
+OLLAMA_BUILD_PID=""
+
 echo "[7/9] Configuring systemd, SSH key-only access and first boot"
 install -d -m 0755 "$ROOTFS/etc/t3mp3st" "$ROOTFS/etc/ssh/sshd_config.d"
 install -m 0640 -o root -g "$(chroot "$ROOTFS" getent group t3mp3st | cut -d: -f3)" \
   "$SCRIPT_DIR/t3mp3st.env" "$ROOTFS/etc/t3mp3st/t3mp3st.env"
 install -m 0644 "$SCRIPT_DIR/t3mp3st.service" \
   "$ROOTFS/etc/systemd/system/t3mp3st.service"
+install -m 0644 "$SCRIPT_DIR/ollama.service" \
+  "$ROOTFS/etc/systemd/system/ollama.service"
 install -m 0644 "$SCRIPT_DIR/t3mp3st-firstboot.service" \
   "$ROOTFS/etc/systemd/system/t3mp3st-firstboot.service"
 install -m 0755 "$SCRIPT_DIR/t3mp3st-firstboot.sh" \
   "$ROOTFS/usr/local/sbin/t3mp3st-firstboot"
+install -m 0755 "$SCRIPT_DIR/t3mp3st-free-ai.sh" \
+  "$ROOTFS/usr/local/sbin/t3mp3st-free-ai"
 
 cat > "$ROOTFS/etc/ssh/sshd_config.d/99-t3mp3st-hardening.conf" <<'EOF'
 PasswordAuthentication no
@@ -202,6 +264,8 @@ Base: Debian 12 bookworm amd64
 T3MP3ST commit: $T3MP3ST_COMMIT
 Node.js: $NODE_VERSION
 Codex CLI: $CODEX_VERSION
+Ollama: $OLLAMA_VERSION (CPU-only)
+Offline local model: $OLLAMA_MODEL
 Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 Credentials: none embedded
 EOF
@@ -209,6 +273,7 @@ EOF
 systemctl --root="$ROOTFS" enable ssh.service
 systemctl --root="$ROOTFS" enable t3mp3st-firstboot.service
 systemctl --root="$ROOTFS" enable t3mp3st.service
+systemctl --root="$ROOTFS" enable ollama.service
 
 echo "[8/9] Removing build caches, machine identity and generated secrets"
 chroot "$ROOTFS" apt-get clean
@@ -242,20 +307,27 @@ for required in \
   /opt/t3mp3st/node_modules \
   /usr/local/bin/node \
   /usr/local/bin/codex \
+  /usr/local/bin/ollama \
   /etc/systemd/system/t3mp3st.service \
+  /etc/systemd/system/ollama.service \
+  /usr/local/sbin/t3mp3st-free-ai \
   /usr/local/sbin/t3mp3st-firstboot; do
   chroot "$ROOTFS" test -e "$required" || {
     echo "Required image path missing: $required" >&2
     exit 1
   }
 done
+find "$ROOTFS/var/lib/ollama/models/blobs" -type f -size +500M -print -quit | grep -q . || {
+  echo "Offline Ollama model blob is missing" >&2
+  exit 1
+}
 
 unmount_chroot
 
 echo "[9/9] Packing and validating Proxmox vzdump-compatible rootfs"
-rm -f "$OUT_DIR/$IMAGE_NAME" "$OUT_DIR/$IMAGE_NAME.sha256"
+rm -f "$OUT_DIR/$IMAGE_NAME" "$OUT_DIR/$IMAGE_NAME.sha256" "$OUT_DIR/$IMAGE_NAME.part-"*
 tar --numeric-owner --xattrs --acls -C "$ROOTFS" \
-  -I 'zstd -19 -T0' -cpf "$OUT_DIR/$IMAGE_NAME" .
+  -I 'zstd -10 -T0' -cpf "$OUT_DIR/$IMAGE_NAME" .
 zstd --test "$OUT_DIR/$IMAGE_NAME"
 (
   cd "$OUT_DIR"
@@ -266,7 +338,19 @@ install -m 0644 "$SCRIPT_DIR/INSTALL_PROXMOX_RU.txt" "$OUT_DIR/INSTALL_PROXMOX_R
 tar -tf "$OUT_DIR/$IMAGE_NAME" > "$WORK_DIR/image-contents.txt"
 grep -Fxq './opt/t3mp3st-afc9dad1/dist/server.js' "$WORK_DIR/image-contents.txt"
 grep -Fxq './etc/systemd/system/t3mp3st.service' "$WORK_DIR/image-contents.txt"
+grep -Fxq './etc/systemd/system/ollama.service' "$WORK_DIR/image-contents.txt"
+grep -Fxq './usr/local/sbin/t3mp3st-free-ai' "$WORK_DIR/image-contents.txt"
+
+# GitHub Release assets are limited to 2 GiB each. Split only when necessary;
+# the checksum always describes the reconstructed .tar.zst.
+image_size="$(stat -c %s "$OUT_DIR/$IMAGE_NAME")"
+if (( image_size > 1900000000 )); then
+  split -b 1800M -d -a 2 "$OUT_DIR/$IMAGE_NAME" "$OUT_DIR/$IMAGE_NAME.part-"
+  rm -f "$OUT_DIR/$IMAGE_NAME"
+  printf 'The template is split. Reassemble before sha256sum/pct create:\n  cat %s.part-* > %s\n' \
+    "$IMAGE_NAME" "$IMAGE_NAME" > "$OUT_DIR/JOIN_PROXMOX_RU.txt"
+fi
 
 echo "Build complete:"
-ls -lh "$OUT_DIR/$IMAGE_NAME" "$OUT_DIR/$IMAGE_NAME.sha256" "$OUT_DIR/INSTALL_PROXMOX_RU.txt"
+ls -lh "$OUT_DIR"/*
 cat "$OUT_DIR/$IMAGE_NAME.sha256"

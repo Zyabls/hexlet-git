@@ -1,14 +1,14 @@
 # T3MP3ST Proxmox LXC
 
-## Готовый офлайн-шаблон
+## Готовый Free AI офлайн-шаблон
 
 GitHub Actions собирает и публикует в Release настоящий незашифрованный Proxmox
 LXC rootfs (`.tar.zst`). Внутри уже есть Debian, Node.js, npm-зависимости,
-собранный T3MP3ST и Codex CLI. На корпоративном узле Proxmox ничего скачивать
-не потребуется.
+собранный T3MP3ST, Codex CLI, CPU-only Ollama и локальная Qwen2.5-Coder 1.5B.
+На корпоративном узле Proxmox ничего скачивать не потребуется.
 
-- Release: <https://github.com/Zyabls/hexlet-git/releases/tag/t3mp3st-lxc-offline-20260803>
-- Прямая ссылка: <https://github.com/Zyabls/hexlet-git/releases/download/t3mp3st-lxc-offline-20260803/t3mp3st-debian12-pve-offline-amd64-afc9dad1.tar.zst>
+- Free AI Release: <https://github.com/Zyabls/hexlet-git/releases/tag/t3mp3st-lxc-free-ai-20260803>
+- Базовый Release без локальной модели: <https://github.com/Zyabls/hexlet-git/releases/tag/t3mp3st-lxc-offline-20260803>
 - Инструкция: `INSTALL_PROXMOX_RU.txt` внутри Release
 
 Сборка воспроизводится workflow-файлом `.github/workflows/build-t3mp3st-lxc.yml`

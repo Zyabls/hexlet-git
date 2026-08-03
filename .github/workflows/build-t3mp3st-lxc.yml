@@ -21,9 +21,9 @@ concurrency:
 jobs:
   build-and-publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
-      RELEASE_TAG: t3mp3st-lxc-offline-20260803
+      RELEASE_TAG: t3mp3st-lxc-free-ai-20260803
     steps:
       - name: Clone artifact branch
         env:
@@ -68,6 +68,6 @@ jobs:
             gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/out/* \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "T3MP3ST offline Proxmox LXC (2026-08-03)" \
+              --title "T3MP3ST Free AI offline Proxmox LXC (2026-08-03)" \
               --notes-file offline-image/RELEASE_NOTES_RU.md
           fi
