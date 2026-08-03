@@ -257,7 +257,10 @@ rm -f "$OUT_DIR/$IMAGE_NAME" "$OUT_DIR/$IMAGE_NAME.sha256"
 tar --numeric-owner --xattrs --acls -C "$ROOTFS" \
   -I 'zstd -19 -T0' -cpf "$OUT_DIR/$IMAGE_NAME" .
 zstd --test "$OUT_DIR/$IMAGE_NAME"
-sha256sum "$OUT_DIR/$IMAGE_NAME" > "$OUT_DIR/$IMAGE_NAME.sha256"
+(
+  cd "$OUT_DIR"
+  sha256sum "$IMAGE_NAME" > "$IMAGE_NAME.sha256"
+)
 install -m 0644 "$SCRIPT_DIR/INSTALL_PROXMOX_RU.txt" "$OUT_DIR/INSTALL_PROXMOX_RU.txt"
 
 tar -tf "$OUT_DIR/$IMAGE_NAME" > "$WORK_DIR/image-contents.txt"
