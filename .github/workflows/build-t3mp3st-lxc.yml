@@ -32,8 +32,29 @@ jobs:
           git clone --depth 1 --branch "$GITHUB_REF_NAME" "$SOURCE_URL" "$GITHUB_WORKSPACE/src"
 
       - name: Build and verify rootfs template
+        id: build
         run: |
-          sudo bash "$GITHUB_WORKSPACE/src/offline-image/build.sh" "$GITHUB_WORKSPACE/out"
+          set +e
+          sudo bash "$GITHUB_WORKSPACE/src/offline-image/build.sh" "$GITHUB_WORKSPACE/out" \
+            > >(tee "$GITHUB_WORKSPACE/build.log") 2>&1
+          build_status=$?
+          echo "status=$build_status" >> "$GITHUB_OUTPUT"
+          exit "$build_status"
+
+      - name: Preserve failed build diagnostics on the artifact branch
+        if: failure() && steps.build.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tail -n 500 "$GITHUB_WORKSPACE/build.log" > "$GITHUB_WORKSPACE/LAST_BUILD_FAILURE.log"
+          log_content="$(base64 -w0 "$GITHUB_WORKSPACE/LAST_BUILD_FAILURE.log")"
+          api_path="repos/$GITHUB_REPOSITORY/contents/offline-image/LAST_BUILD_FAILURE.log"
+          current_sha="$(gh api -X GET "$api_path" -f ref="$GITHUB_REF_NAME" --jq .sha 2>/dev/null || true)"
+          args=(-X PUT -f "message=Record failed offline image build" -f "content=$log_content" -f "branch=$GITHUB_REF_NAME")
+          if [[ -n "$current_sha" ]]; then
+            args+=(-f "sha=$current_sha")
+          fi
+          gh api "$api_path" "${args[@]}"
 
       - name: Publish GitHub Release
         env:
@@ -50,4 +71,3 @@ jobs:
               --title "T3MP3ST offline Proxmox LXC (2026-08-03)" \
               --notes-file offline-image/RELEASE_NOTES_RU.md
           fi
-
