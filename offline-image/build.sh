@@ -238,14 +238,14 @@ if [[ -n "$credential_hit" ]]; then
 fi
 
 for required in \
-  opt/t3mp3st/dist/server.js \
-  opt/t3mp3st/node_modules \
-  usr/local/bin/node \
-  usr/local/bin/codex \
-  etc/systemd/system/t3mp3st.service \
-  usr/local/sbin/t3mp3st-firstboot; do
-  [[ -e "$ROOTFS/$required" ]] || {
-    echo "Required image path missing: /$required" >&2
+  /opt/t3mp3st/dist/server.js \
+  /opt/t3mp3st/node_modules \
+  /usr/local/bin/node \
+  /usr/local/bin/codex \
+  /etc/systemd/system/t3mp3st.service \
+  /usr/local/sbin/t3mp3st-firstboot; do
+  chroot "$ROOTFS" test -e "$required" || {
+    echo "Required image path missing: $required" >&2
     exit 1
   }
 done
