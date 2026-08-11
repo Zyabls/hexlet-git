@@ -103,6 +103,21 @@ check 'syft filesystem SBOM' bash -c "syft 'dir:$fixture' -o cyclonedx-json='$ru
 evidence_body="$fixture/http-response.txt"
 printf 'HTTP/1.1 200 OK\nX-T3MP3ST-Canary: present\nAuthorization: Bearer sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n' > "$evidence_body"
 evidence_sha="$(sha256sum "$evidence_body" | cut -d' ' -f1)"
+ledger_mission_id="acceptance-$timestamp"
+ledger_evidence_id="EV-$timestamp"
+ledger_finding_id="FINDING-$timestamp"
+check 'ledger persistence uses filesystem' bash -c "curl -fsS http://127.0.0.1:3333/api/learning/status > '$run_dir/learning-status.json' && jq -e '.policy.persistence == \"filesystem\" and (.policy.stateFile | type == \"string\")' '$run_dir/learning-status.json' >/dev/null"
+jq -n --arg id "$ledger_evidence_id" --arg mission "$ledger_mission_id" --rawfile content "$evidence_body" \
+  '{id:$id,missionId:$mission,type:"log",title:"Synthetic acceptance response",summary:"Bounded local evidence fixture.",content:$content,source:"tool",provenanceStrength:"tool"}' \
+  > "$run_dir/ledger-evidence-request.json"
+check 'canonical evidence ledger capture' bash -c "curl -fsS http://127.0.0.1:3333/api/evidence -H 'content-type: application/json' --data-binary '@$run_dir/ledger-evidence-request.json' > '$run_dir/ledger-evidence-response.json' && jq -e --arg id '$ledger_evidence_id' --arg sha '$evidence_sha' '.id == \$id and .sha256 == \$sha and (.path | type == \"string\") and (.content | contains(\"sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\") | not)' '$run_dir/ledger-evidence-response.json' >/dev/null"
+jq -n --arg id "$ledger_finding_id" --arg mission "$ledger_mission_id" --arg evidence "$ledger_evidence_id" \
+  '{id:$id,missionId:$mission,family:"web_api",title:"Synthetic persisted finding",target:"127.0.0.1",claim:"The bounded canary is present.",impact:"Acceptance fixture only.",severity:"high",confidence:1,status:"verified",evidenceIds:[$evidence],recommendedFix:"Remove the bounded canary.",acceptanceCriteria:["Canary is absent after remediation."]}' \
+  > "$run_dir/ledger-finding-request.json"
+check 'canonical finding links evidence' bash -c "curl -fsS http://127.0.0.1:3333/api/findings -H 'content-type: application/json' --data-binary '@$run_dir/ledger-finding-request.json' > '$run_dir/ledger-finding-response.json' && jq -e --arg evidence '$ledger_evidence_id' '.evidenceIds | index(\$evidence)' '$run_dir/ledger-finding-response.json' >/dev/null"
+check 'mission report resolves persistent evidence' bash -c "curl -fsS 'http://127.0.0.1:3333/api/mission/$ledger_mission_id/report' > '$run_dir/mission-report.json' && jq -e --arg evidence '$ledger_evidence_id' --arg sha '$evidence_sha' '.report | contains(\"## Persistent Evidence Ledger\") and contains(\$evidence) and contains(\$sha) and (contains(\"sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\") | not)' '$run_dir/mission-report.json' >/dev/null"
+jq -n --slurpfile finding "$run_dir/ledger-finding-response.json" '{platform:"hackerone",programHandle:"local-fixture",finding:$finding[0]}' > "$run_dir/ledger-bounty-request.json"
+check 'bounty report resolves canonical ledger evidence' bash -c "curl -fsS http://127.0.0.1:3333/api/bounty/format -H 'content-type: application/json' --data-binary '@$run_dir/ledger-bounty-request.json' > '$run_dir/ledger-bounty-response.json' && jq -e --arg evidence '$ledger_evidence_id' --arg sha '$evidence_sha' '.report.severity == \"high\" and (.report.body | contains(\"## Evidence Appendix\") and contains(\$evidence) and contains(\$sha) and (contains(\"sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\") | not))' '$run_dir/ledger-bounty-response.json' >/dev/null"
 jq -n --arg sha "$evidence_sha" '{platform:"hackerone",programHandle:"local-fixture",finding:{id:"finding-acceptance-1",title:"Synthetic acceptance finding",severity_self:"low",summary:"Bounded local fixture only.",root_cause:"Synthetic condition.",poc:"Request the local fixture.",impact:"No production impact.",remediation:"Remove the fixture.",evidence:[{id:"EV-HTTP-1",type:"http-response",content:"HTTP/1.1 200 OK\nAuthorization: Bearer sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",path:"evidence/http-response.txt",sha256:$sha}]}}' > "$run_dir/bounty-request.json"
 check 'bounty report evidence E2E' bash -c "curl -fsS http://127.0.0.1:3333/api/bounty/format -H 'content-type: application/json' --data-binary '@$run_dir/bounty-request.json' > '$run_dir/bounty-response.json' && jq -e --arg sha '$evidence_sha' '.report.body | contains(\"## Evidence Appendix\") and contains(\"EV-HTTP-1\") and contains(\$sha) and (contains(\"sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\") | not)' '$run_dir/bounty-response.json' >/dev/null"
 
@@ -125,7 +140,7 @@ while IFS= read -r -d '' evidence_file; do
   evidence_id="E-$(printf '%04d' "$((++evidence_count))")"
   printf '| %s | `%s` | `%s` |\n' "$evidence_id" "${evidence_file#$run_dir/}" "$(sha256sum "$evidence_file" | cut -d' ' -f1)" >> "$report"
 done < <(find "$run_dir" -type f ! -name verify.log -print0 | sort -z)
-check 'generated reports redact fake secret' bash -c "! grep -qs 'sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' '$report' '$run_dir/bounty-response.json'"
+check 'generated reports redact fake secret' bash -c "! grep -qs 'sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' '$report' '$run_dir/bounty-response.json' '$run_dir/ledger-bounty-response.json' '$run_dir/mission-report.json' '$run_dir/ledger-evidence-response.json'"
 check 'HTML report render' pandoc "$report" -s -o "${report%.md}.html"
 check 'PDF report render' pandoc "$report" --pdf-engine=weasyprint -o "${report%.md}.pdf"
 
@@ -139,6 +154,11 @@ if (( live_llm )); then
 fi
 
 if (( stability )); then
+  sleep 2
+  systemctl restart t3mp3st.service
+  for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:3333/api/health >/dev/null 2>&1 && break; sleep 1; done
+  check 'evidence survives service restart' bash -c "curl -fsS 'http://127.0.0.1:3333/api/evidence?missionId=$ledger_mission_id' > '$run_dir/ledger-after-restart.json' && jq -e --arg evidence '$ledger_evidence_id' --arg sha '$evidence_sha' 'any(.evidence[]?; .id == \$evidence and .sha256 == \$sha)' '$run_dir/ledger-after-restart.json' >/dev/null"
+  check 'evidence-backed report survives restart' bash -c "curl -fsS 'http://127.0.0.1:3333/api/mission/$ledger_mission_id/report' > '$run_dir/report-after-restart.json' && jq -e --arg evidence '$ledger_evidence_id' --arg sha '$evidence_sha' '.report | contains(\$evidence) and contains(\$sha)' '$run_dir/report-after-restart.json' >/dev/null"
   restarts_before="$(systemctl show -p NRestarts --value t3mp3st.service)"
   seq 1 1000 | xargs -P10 -n1 sh -c 'curl -fsS --max-time 10 http://127.0.0.1:3333/api/health -o /dev/null' _
   restarts_after="$(systemctl show -p NRestarts --value t3mp3st.service)"

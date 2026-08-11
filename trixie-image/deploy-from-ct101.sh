@@ -81,6 +81,8 @@ new_root="$(readlink -f "/var/lib/lxc/$new_id/rootfs")"
 root_uid="$(stat -c %u "$new_root/etc")"
 root_gid="$(stat -c %g "$new_root/etc")"
 t3_gid="$(stat -c %g "$new_root/etc/t3mp3st/t3mp3st.env")"
+t3_uid="$(stat -c %u "$new_root/var/lib/t3mp3st")"
+t3_data_gid="$(stat -c %g "$new_root/var/lib/t3mp3st")"
 install -d -m 0750 -o "$root_uid" -g "$t3_gid" "$new_root/etc/t3mp3st"
 api_key=''
 for candidate in relay.env openai-relay.env t3mp3st.env; do
@@ -109,6 +111,15 @@ if [[ -s "$old_root/root/.ssh/authorized_keys" ]]; then
   install -d -m 0700 -o "$root_uid" -g "$root_gid" "$new_root/root/.ssh"
   install -m 0600 -o "$root_uid" -g "$root_gid" "$old_root/root/.ssh/authorized_keys" "$new_root/root/.ssh/authorized_keys"
 fi
+for data_dir in evidence reports state; do
+  source_dir="$old_root/var/lib/t3mp3st/$data_dir"
+  target_dir="$new_root/var/lib/t3mp3st/$data_dir"
+  install -d -m 0750 -o "$t3_uid" -g "$t3_data_gid" "$target_dir"
+  if [[ -d "$source_dir" ]]; then
+    cp -a "$source_dir/." "$target_dir/"
+    chown -R "$t3_uid:$t3_data_gid" "$target_dir"
+  fi
+done
 cleanup_mounts
 old_mounted=0; new_mounted=0
 trap - EXIT

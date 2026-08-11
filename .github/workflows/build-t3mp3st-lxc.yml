@@ -78,6 +78,8 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE/src"
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --notes-file trixie-image/RELEASE_NOTES_RU.md
             gh release upload "$RELEASE_TAG" "$GITHUB_WORKSPACE"/out/* \
               --repo "$GITHUB_REPOSITORY" --clobber
           else

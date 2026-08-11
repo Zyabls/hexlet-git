@@ -81,7 +81,7 @@ chroot "$rootfs" useradd --system --create-home --home-dir /var/lib/t3mp3st/home
 chroot "$rootfs" useradd --create-home --shell /bin/bash t3admin
 chroot "$rootfs" passwd --lock t3admin
 t3_uid="$(chroot "$rootfs" id -u t3mp3st)"; t3_gid="$(chroot "$rootfs" id -g t3mp3st)"
-install -d -m 0750 -o "$t3_uid" -g "$t3_gid" "$rootfs/var/lib/t3mp3st" "$rootfs/var/lib/t3mp3st/home" "$rootfs/var/lib/t3mp3st/reports" "$rootfs/var/lib/t3mp3st/evidence"
+install -d -m 0750 -o "$t3_uid" -g "$t3_gid" "$rootfs/var/lib/t3mp3st" "$rootfs/var/lib/t3mp3st/home" "$rootfs/var/lib/t3mp3st/reports" "$rootfs/var/lib/t3mp3st/evidence" "$rootfs/var/lib/t3mp3st/state"
 chown -R "$t3_uid:$t3_gid" "$rootfs/opt/t3mp3st"
 run_as_t3mp3st() {
   chroot "$rootfs" runuser -u t3mp3st -- env \
@@ -96,6 +96,7 @@ run_as_t3mp3st npm --prefix /opt/t3mp3st run typecheck
 run_as_t3mp3st npm --prefix /opt/t3mp3st run lint
 run_as_t3mp3st npm --prefix /opt/t3mp3st test -- --run
 run_as_t3mp3st npm --prefix /opt/t3mp3st run build
+run_as_t3mp3st node /opt/t3mp3st/scripts/evidence-persistence-e2e.mjs
 chown -R root:root "$rootfs/opt/t3mp3st"
 ln -sfn /var/lib/t3mp3st/reports "$rootfs/opt/t3mp3st/reports"
 ln -sfn /var/lib/t3mp3st/evidence "$rootfs/opt/t3mp3st/evidence"
@@ -194,9 +195,15 @@ tar --sort=name --mtime="@$source_date_epoch" --clamp-mtime --numeric-owner \
 echo '[9/9] Release evidence and checksums'
 source_sha="$(cut -d' ' -f1 "$source_checksum")"
 image_sha="$(sha256sum "$out_dir/$image_name" | cut -d' ' -f1)"
+hotfix_name=t3mp3st-evidence-hotfix-debian13-amd64.tar.gz
+tar --sort=name --mtime="@$source_date_epoch" --clamp-mtime --numeric-owner \
+  --pax-option=delete=atime,delete=ctime -C "$rootfs/opt/t3mp3st" -cf - dist docs \
+  | gzip -n -9 > "$out_dir/$hotfix_name"
 cat > "$out_dir/BUILD-MANIFEST.json" <<EOF
-{"schema":1,"image":"$image_name","sha256":"$image_sha","base":"$base_name","base_sha512":"$base_sha512","source_sha256":"$source_sha","node":"$node_version","model":"gpt-oss-120b","os":"Debian 13.6","build_epoch":$source_date_epoch}
+{"schema":1,"image":"$image_name","sha256":"$image_sha","hotfix":"$hotfix_name","base":"$base_name","base_sha512":"$base_sha512","source_sha256":"$source_sha","node":"$node_version","model":"gpt-oss-120b","os":"Debian 13.6","build_epoch":$source_date_epoch}
 EOF
-(cd "$out_dir" && sha256sum "$image_name" BUILD-MANIFEST.json > SHA256SUMS)
-cp "$script_dir/README_RU.md" "$script_dir/deploy-from-ct101.sh" "$script_dir/required-tools.json" "$script_dir/tools.lock.tsv" "$out_dir/"
+cp "$script_dir/README_RU.md" "$script_dir/deploy-from-ct101.sh" "$script_dir/upgrade-evidence-hotfix.sh" \
+  "$script_dir/t3mp3st-verify.sh" "$script_dir/required-tools.json" "$script_dir/tools.lock.tsv" "$out_dir/"
+(cd "$out_dir" && sha256sum "$image_name" "$hotfix_name" BUILD-MANIFEST.json \
+  deploy-from-ct101.sh upgrade-evidence-hotfix.sh t3mp3st-verify.sh > SHA256SUMS)
 echo "Built: $out_dir/$image_name"

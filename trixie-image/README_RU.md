@@ -74,6 +74,39 @@ sudo configure-gpt-oss --key-file /root/gpt-oss.key
 sudo htpasswd /etc/t3mp3st/nginx.htpasswd t3admin
 ```
 
+## Исправление evidence в уже установленном CT
+
+Переустанавливать контейнер и повторно настраивать сеть, nginx или LLM не
+нужно. Скачайте из Release четыре файла:
+
+- `t3mp3st-evidence-hotfix-debian13-amd64.tar.gz`;
+- `upgrade-evidence-hotfix.sh`;
+- `t3mp3st-verify.sh`;
+- `SHA256SUMS`.
+
+Загрузите их в контейнер (ниже `241` — пример CTID):
+
+```bash
+pct push 241 ./t3mp3st-evidence-hotfix-debian13-amd64.tar.gz /root/t3mp3st-evidence-hotfix-debian13-amd64.tar.gz
+pct push 241 ./upgrade-evidence-hotfix.sh /root/upgrade-evidence-hotfix.sh
+pct push 241 ./t3mp3st-verify.sh /root/t3mp3st-verify.sh
+pct push 241 ./SHA256SUMS /root/SHA256SUMS
+pct exec 241 -- bash -lc 'cd /root && sha256sum -c SHA256SUMS --ignore-missing'
+pct exec 241 -- bash -lc 'cd /root && chmod 0700 upgrade-evidence-hotfix.sh && ./upgrade-evidence-hotfix.sh ./t3mp3st-evidence-hotfix-debian13-amd64.tar.gz ./SHA256SUMS'
+```
+
+Обновлятор до первого restart сохраняет доступные in-memory findings,
+evidence и report в root-only backup. Затем он атомарно меняет `dist`/`docs`,
+переносит старые записи в постоянный filesystem ledger и проверяет один и тот
+же Evidence ID и SHA-256 до и после restart. При ошибке приложение и env
+откатываются автоматически; путь к backup и rollback-копии выводится в конце.
+
+После успешного обновления выполните полную локальную проверку:
+
+```bash
+pct exec 241 -- t3mp3st-verify --stability
+```
+
 ## Проверка готовности
 
 ```bash

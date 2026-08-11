@@ -4,6 +4,9 @@ set -Eeuo pipefail
 marker=/var/lib/t3mp3st/.firstboot-complete
 [[ ! -e "$marker" ]] || exit 0
 
+install -d -m 0750 -o t3mp3st -g t3mp3st \
+  /var/lib/t3mp3st/evidence /var/lib/t3mp3st/reports /var/lib/t3mp3st/state
+
 ssh-keygen -A
 install -d -m 0700 -o t3admin -g t3admin /home/t3admin/.ssh
 if [[ -s /root/.ssh/authorized_keys && ! -s /home/t3admin/.ssh/authorized_keys ]]; then
