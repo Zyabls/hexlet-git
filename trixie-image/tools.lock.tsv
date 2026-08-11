@@ -16,3 +16,4 @@ trivy	0.73.0	https://github.com/aquasecurity/trivy/releases/download/v0.73.0/tri
 syft	1.51.0	https://github.com/anchore/syft/releases/download/v1.51.0/syft_1.51.0_linux_amd64.tar.gz	2a2e837a2c8d59ec9af5472ee22d3b04ee463c4e44476ecf993fd1e5ab6ebc7f	tar.gz	syft
 grype	0.117.0	https://github.com/anchore/grype/releases/download/v0.117.0/grype_0.117.0_linux_amd64.tar.gz	38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26	tar.gz	grype
 osv-scanner	2.5.0	https://github.com/google/osv-scanner/releases/download/v2.5.0/osv-scanner_linux_amd64	edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c	raw	osv-scanner
+nikto	2.6.1	https://codeload.github.com/sullo/nikto/tar.gz/refs/tags/2.6.1	d1ca1acb05d81a5a6f374c0afdd76b33afa0089278631a20673c0210a71d992f	tar.gz	nikto.pl

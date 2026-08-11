@@ -58,7 +58,8 @@ chroot "$rootfs" apt-get install -y --no-install-recommends \
   jq file openssl dnsutils whois nmap iproute2 iputils-ping netcat-openbsd lsof tcpdump \
   procps less vim-tiny ripgrep unzip xz-utils zstd tar locales ifupdown \
   chromium pandoc poppler-utils weasyprint libimage-exiftool-perl yara \
-  nikto sqlmap whatweb testssl.sh
+  perl libnet-ssleay-perl libjson-perl libio-socket-ssl-perl libxml-writer-perl libxml-libxml-perl \
+  sqlmap whatweb testssl.sh
 chroot "$rootfs" apt-get clean
 rm -rf "$rootfs/var/lib/apt/lists"/*
 printf 'en_US.UTF-8 UTF-8\n' > "$rootfs/etc/locale.gen"
@@ -106,6 +107,13 @@ install_locked_tool() {
   esac
   source="$(find "$extract" -type f -name "$selector" -print -quit)"
   [[ -n "$source" ]] || { echo "$name binary missing in archive" >&2; return 1; }
+  if [[ "$name" == nikto ]]; then
+    rm -rf "$rootfs/opt/nikto"
+    cp -a "$(dirname "$(dirname "$source")")" "$rootfs/opt/nikto"
+    chmod 0755 "$rootfs/opt/nikto/program/nikto.pl"
+    ln -sfn /opt/nikto/program/nikto.pl "$rootfs/usr/local/bin/nikto"
+    return
+  fi
   install -m 0755 "$source" "$rootfs/usr/local/bin/$selector"
 }
 while IFS=$'\t' read -r name version url sha format selector; do
