@@ -83,11 +83,19 @@ chroot "$rootfs" passwd --lock t3admin
 t3_uid="$(chroot "$rootfs" id -u t3mp3st)"; t3_gid="$(chroot "$rootfs" id -g t3mp3st)"
 install -d -m 0750 -o "$t3_uid" -g "$t3_gid" "$rootfs/var/lib/t3mp3st" "$rootfs/var/lib/t3mp3st/home" "$rootfs/var/lib/t3mp3st/reports" "$rootfs/var/lib/t3mp3st/evidence"
 chown -R "$t3_uid:$t3_gid" "$rootfs/opt/t3mp3st"
-chroot "$rootfs" runuser -u t3mp3st -- env HOME=/var/lib/t3mp3st/home NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false npm --prefix /opt/t3mp3st ci
-chroot "$rootfs" runuser -u t3mp3st -- env HOME=/var/lib/t3mp3st/home npm --prefix /opt/t3mp3st run typecheck
-chroot "$rootfs" runuser -u t3mp3st -- env HOME=/var/lib/t3mp3st/home npm --prefix /opt/t3mp3st run lint
-chroot "$rootfs" runuser -u t3mp3st -- env HOME=/var/lib/t3mp3st/home npm --prefix /opt/t3mp3st test -- --run
-chroot "$rootfs" runuser -u t3mp3st -- env HOME=/var/lib/t3mp3st/home npm --prefix /opt/t3mp3st run build
+run_as_t3mp3st() {
+  chroot "$rootfs" runuser -u t3mp3st -- env \
+    HOME=/var/lib/t3mp3st/home \
+    XDG_CONFIG_HOME=/var/lib/t3mp3st/home/.config \
+    XDG_CACHE_HOME=/var/lib/t3mp3st/home/.cache \
+    PATH=/usr/local/bin:/usr/bin:/bin \
+    "$@"
+}
+run_as_t3mp3st env NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false npm --prefix /opt/t3mp3st ci
+run_as_t3mp3st npm --prefix /opt/t3mp3st run typecheck
+run_as_t3mp3st npm --prefix /opt/t3mp3st run lint
+run_as_t3mp3st npm --prefix /opt/t3mp3st test -- --run
+run_as_t3mp3st npm --prefix /opt/t3mp3st run build
 chown -R root:root "$rootfs/opt/t3mp3st"
 ln -sfn /var/lib/t3mp3st/reports "$rootfs/opt/t3mp3st/reports"
 ln -sfn /var/lib/t3mp3st/evidence "$rootfs/opt/t3mp3st/evidence"
