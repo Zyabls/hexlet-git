@@ -115,6 +115,13 @@ trap - EXIT
 
 pct start "$new_id"
 sleep 8
+# A migrated htpasswd file may retain the t3mp3st group from the mounted
+# unprivileged rootfs. nginx workers run as www-data and return HTTP 500 when
+# auth_basic cannot read that file, so enforce the runtime ownership here.
+pct exec "$new_id" -- chown root:www-data /etc/t3mp3st/nginx.htpasswd
+pct exec "$new_id" -- chmod 0640 /etc/t3mp3st/nginx.htpasswd
+pct exec "$new_id" -- nginx -t
+pct exec "$new_id" -- systemctl restart nginx.service
 pct exec "$new_id" -- systemctl is-active --quiet nginx t3mp3st t3mp3st-llm-relay
 echo "CT $new_id passed disconnected service boot."
 
