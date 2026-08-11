@@ -37,6 +37,9 @@ if [[ ! -s /etc/t3mp3st/nginx.htpasswd ]]; then
 fi
 chmod 0640 /etc/t3mp3st/nginx.htpasswd
 chown root:www-data /etc/t3mp3st/nginx.htpasswd
+# nginx workers need directory traversal to open auth_basic_user_file. Secret
+# files remain protected by their individual root:t3mp3st mode 0640.
+chmod 0751 /etc/t3mp3st
 
 nginx -t
 touch "$marker"

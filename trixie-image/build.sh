@@ -136,7 +136,7 @@ chroot "$rootfs" /opt/wafw00f/bin/pip install --no-cache-dir 'wafw00f==2.3.2'
 ln -sfn /opt/wafw00f/bin/wafw00f "$rootfs/usr/local/bin/wafw00f"
 
 echo '[6/9] Runtime services, nginx, first boot and secure configuration'
-install -d -m 0750 -o root -g "$t3_gid" "$rootfs/etc/t3mp3st"
+install -d -m 0751 -o root -g "$t3_gid" "$rootfs/etc/t3mp3st"
 install -d -m 0755 "$rootfs/usr/local/lib/t3mp3st" "$rootfs/usr/local/share/t3mp3st" "$rootfs/etc/ssh/sshd_config.d"
 install -m 0640 -o root -g "$t3_gid" "$script_dir/t3mp3st.env" "$rootfs/etc/t3mp3st/t3mp3st.env"
 install -m 0640 -o root -g "$t3_gid" "$script_dir/relay.env.example" "$rootfs/etc/t3mp3st/relay.env"

@@ -118,6 +118,7 @@ sleep 8
 # A migrated htpasswd file may retain the t3mp3st group from the mounted
 # unprivileged rootfs. nginx workers run as www-data and return HTTP 500 when
 # auth_basic cannot read that file, so enforce the runtime ownership here.
+pct exec "$new_id" -- chmod 0751 /etc/t3mp3st
 pct exec "$new_id" -- chown root:www-data /etc/t3mp3st/nginx.htpasswd
 pct exec "$new_id" -- chmod 0640 /etc/t3mp3st/nginx.htpasswd
 pct exec "$new_id" -- nginx -t
