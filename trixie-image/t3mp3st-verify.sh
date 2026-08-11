@@ -39,6 +39,13 @@ curl_config="$(mktemp)"
 chmod 0600 "$curl_config"
 printf 'insecure\nsilent\nshow-error\nuser = "t3verify:%s"\n' "$verify_password" > "$curl_config"
 if curl --config "$curl_config" --fail https://127.0.0.1/api/health -o "$run_dir/nginx-health.json"; then pass 'authenticated nginx proxy/Host header'; else fail 'authenticated nginx proxy/Host header'; fi
+if curl --config "$curl_config" --fail -H 'Origin: https://127.0.0.1' -H 'Content-Type: application/json' \
+  --data '{"provider":"openai"}' https://127.0.0.1/api/models -o "$run_dir/nginx-models.json" \
+  && jq -e '.serverLocked == true and (.models | length > 0)' "$run_dir/nginx-models.json" >/dev/null; then
+  pass 'authenticated nginx same-origin POST proxy'
+else
+  fail 'authenticated nginx same-origin POST proxy'
+fi
 sed -i '/^t3verify:/d' /etc/t3mp3st/nginx.htpasswd
 rm -f -- "$curl_config"
 unset verify_password
