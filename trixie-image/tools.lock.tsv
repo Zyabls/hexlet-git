@@ -1,0 +1,18 @@
+# name	version	url	sha256	format	binary
+httpx	1.10.0	https://github.com/projectdiscovery/httpx/releases/download/v1.10.0/httpx_1.10.0_linux_amd64.zip	63eac4dcd6e5c9867c94765fdaaf66e7b4eeae3474a1f06e600e266a1c81a53e	zip	httpx
+nuclei	3.11.1	https://github.com/projectdiscovery/nuclei/releases/download/v3.11.1/nuclei_3.11.1_linux_amd64.zip	ea63d4ae232808cd7c6bc00d0142428e231fab59dae01042246097d195835ab6	zip	nuclei
+subfinder	2.15.0	https://github.com/projectdiscovery/subfinder/releases/download/v2.15.0/subfinder_2.15.0_linux_amd64.zip	ce7372c58f25facbbb036c821a6336df2b4017891257f1455cd8d00d704d5862	zip	subfinder
+katana	1.7.0	https://github.com/projectdiscovery/katana/releases/download/v1.7.0/katana_1.7.0_linux_amd64.zip	fe1142d92f418549338ea46d67a472124878482e225d279e9a42700c75d76a4d	zip	katana
+naabu	2.6.1	https://github.com/projectdiscovery/naabu/releases/download/v2.6.1/naabu_2.6.1_linux_amd64.zip	018c4c9884dea971eda860435ede3021d1150732f34cfd245498c6726d8cab90	zip	naabu
+dnsx	1.3.0	https://github.com/projectdiscovery/dnsx/releases/download/v1.3.0/dnsx_1.3.0_linux_amd64.zip	1415020474886151a4820c62b9e68a315cc062f7f111a2fd13fda99047a809a6	zip	dnsx
+dalfox	3.2.0	https://github.com/hahwul/dalfox/releases/download/v3.2.0/dalfox-v3.2.0-linux-x86_64-musl.tar.gz	4664e8dac304d35f4537655bf9b64ef6c529d47c485ec2610112b3328b3e51f9	tar.gz	dalfox
+ffuf	2.2.1	https://github.com/ffuf/ffuf/releases/download/v2.2.1/ffuf_2.2.1_linux_amd64.tar.gz	86307885810d3c36ba4a3e9ba5178c2d9027bba0dd7f4ea39e39e7c972b62396	tar.gz	ffuf
+gobuster	3.8.2	https://github.com/OJ/gobuster/releases/download/v3.8.2/gobuster_Linux_x86_64.tar.gz	c8a8c6a966eeb011d682a0ef2305a3e3a86b8b3fabe744350c00a766cc0f8021	tar.gz	gobuster
+feroxbuster	2.13.1	https://github.com/epi052/feroxbuster/releases/download/v2.13.1/x86_64-linux-feroxbuster.tar.gz	7985c00e6803b0f25d5e9139f7472279f3f4d891429627a5cedc629e53992d80	tar.gz	feroxbuster
+amass	5.1.1	https://github.com/owasp-amass/amass/releases/download/v5.1.1/amass_linux_amd64.tar.gz	5e22b5f0239e7eb79439d60d43d3cd20dca2478588bc2242e91ab0c4f8fa40dd	tar.gz	amass
+gitleaks	8.30.1	https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz	551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb	tar.gz	gitleaks
+trufflehog	3.96.0	https://github.com/trufflesecurity/trufflehog/releases/download/v3.96.0/trufflehog_3.96.0_linux_amd64.tar.gz	7105f1cd6577f058a9e39d0578f1a99c8a1e481e4d3512cd8a09acfe22a0fdc0	tar.gz	trufflehog
+trivy	0.73.0	https://github.com/aquasecurity/trivy/releases/download/v0.73.0/trivy_0.73.0_Linux-64bit.tar.gz	2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b	tar.gz	trivy
+syft	1.51.0	https://github.com/anchore/syft/releases/download/v1.51.0/syft_1.51.0_linux_amd64.tar.gz	2a2e837a2c8d59ec9af5472ee22d3b04ee463c4e44476ecf993fd1e5ab6ebc7f	tar.gz	syft
+grype	0.117.0	https://github.com/anchore/grype/releases/download/v0.117.0/grype_0.117.0_linux_amd64.tar.gz	38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26	tar.gz	grype
+osv-scanner	2.5.0	https://github.com/google/osv-scanner/releases/download/v2.5.0/osv-scanner_linux_amd64	edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c	raw	osv-scanner

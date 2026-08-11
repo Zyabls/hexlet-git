@@ -1,0 +1,31 @@
+[Unit]
+Description=T3MP3ST security workspace
+After=network-online.target t3mp3st-llm-relay.service
+Wants=network-online.target
+Requires=t3mp3st-llm-relay.service
+
+[Service]
+Type=simple
+User=t3mp3st
+Group=t3mp3st
+WorkingDirectory=/opt/t3mp3st
+Environment=HOME=/var/lib/t3mp3st/home
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/t3mp3st/t3mp3st.env
+ExecStart=/usr/local/bin/node /opt/t3mp3st/dist/server.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=120s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+
+# Mount-namespace directives such as PrivateTmp/ProtectSystem are intentionally
+# absent: they fail with systemd status 226/NAMESPACE in unprivileged PVE LXC.
+
+[Install]
+WantedBy=multi-user.target

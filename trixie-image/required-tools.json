@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "profile": "t3mp3st-gpt-oss-120b-production",
+  "required": [
+    "amass", "chromium", "curl", "dalfox", "dig", "dnsx", "exiftool",
+    "feroxbuster", "ffuf", "file", "gitleaks", "git", "gobuster", "grype",
+    "host", "httpx", "jq", "katana", "naabu", "nikto", "nmap", "node",
+    "npm", "nuclei", "openssl", "osv-scanner", "pandoc", "pdftotext", "python3",
+    "semgrep", "sqlmap", "subfinder", "syft", "testssl", "trivy", "trufflehog",
+    "wafw00f", "whatweb", "whois", "yara"
+  ]
+}

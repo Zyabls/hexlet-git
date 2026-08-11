@@ -1,0 +1,12 @@
+[Unit]
+Description=Initialize unique T3MP3ST credentials, TLS and SSH identity
+Before=nginx.service ssh.service t3mp3st.service
+ConditionPathExists=!/var/lib/t3mp3st/.firstboot-complete
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/t3mp3st-firstboot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

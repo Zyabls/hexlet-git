@@ -1,29 +1,27 @@
-name: Build offline T3MP3ST Proxmox LXC template
+name: Build T3MP3ST gpt-oss-120b Debian 13 LXC
 
 on:
   push:
     branches:
-      - artifact/t3mp3st-proxmox-lxc-20260803
+      - artifact/t3mp3st-proxmox-lxc-20260811
     paths:
       - .github/workflows/build-t3mp3st-lxc.yml
-      - offline-image/**
-      - t3mp3st-proxmox-lxc-afc9dad1-20260803.tar.gz
-      - t3mp3st-proxmox-lxc-afc9dad1-20260803.tar.gz.sha256
+      - trixie-image/**
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: t3mp3st-offline-lxc
+  group: t3mp3st-gpt-oss-120b-lxc
   cancel-in-progress: false
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
-      RELEASE_TAG: t3mp3st-lxc-free-ai-20260803
+      RELEASE_TAG: t3mp3st-lxc-gpt-oss-120b-20260811
     steps:
       - name: Clone artifact branch
         env:
@@ -31,30 +29,35 @@ jobs:
         run: |
           git clone --depth 1 --branch "$GITHUB_REF_NAME" "$SOURCE_URL" "$GITHUB_WORKSPACE/src"
 
+      - name: Shell and source snapshot acceptance
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          find "$GITHUB_WORKSPACE/src/trixie-image" -maxdepth 1 -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          shellcheck --severity=error -x "$GITHUB_WORKSPACE/src/trixie-image"/*.sh
+          cd "$GITHUB_WORKSPACE/src/trixie-image/source"
+          sha256sum -c t3mp3st-source.tar.gz.sha256
+
       - name: Build and verify rootfs template
         id: build
         run: |
           set +e
-          sudo bash "$GITHUB_WORKSPACE/src/offline-image/build.sh" "$GITHUB_WORKSPACE/out" \
+          sudo bash "$GITHUB_WORKSPACE/src/trixie-image/build.sh" "$GITHUB_WORKSPACE/out" \
             > >(tee "$GITHUB_WORKSPACE/build.log") 2>&1
           build_status=$?
           echo "status=$build_status" >> "$GITHUB_OUTPUT"
           exit "$build_status"
 
-      - name: Preserve failed build diagnostics on the artifact branch
-        if: failure() && steps.build.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tail -n 500 "$GITHUB_WORKSPACE/build.log" > "$GITHUB_WORKSPACE/LAST_BUILD_FAILURE.log"
-          log_content="$(base64 -w0 "$GITHUB_WORKSPACE/LAST_BUILD_FAILURE.log")"
-          api_path="repos/$GITHUB_REPOSITORY/contents/offline-image/LAST_BUILD_FAILURE.log"
-          current_sha="$(gh api -X GET "$api_path" -f ref="$GITHUB_REF_NAME" --jq .sha 2>/dev/null || true)"
-          args=(-X PUT -f "message=Record failed offline image build" -f "content=$log_content" -f "branch=$GITHUB_REF_NAME")
-          if [[ -n "$current_sha" ]]; then
-            args+=(-f "sha=$current_sha")
-          fi
-          gh api "$api_path" "${args[@]}"
+      - name: Upload build log and acceptance outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3mp3st-lxc-build-${{ github.run_id }}
+          path: |
+            ${{ github.workspace }}/build.log
+            ${{ github.workspace }}/out/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Publish GitHub Release
         env:
@@ -68,6 +71,6 @@ jobs:
             gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/out/* \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "T3MP3ST Free AI offline Proxmox LXC (2026-08-03)" \
-              --notes-file offline-image/RELEASE_NOTES_RU.md
+              --title "T3MP3ST gpt-oss-120b Proxmox LXC / Debian 13.6" \
+              --notes-file trixie-image/RELEASE_NOTES_RU.md
           fi

@@ -1,0 +1,23 @@
+[Unit]
+Description=Host-scoped TLS relay for corporate gpt-oss-120b
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=t3mp3st
+Group=t3mp3st
+Environment=HOME=/var/lib/t3mp3st/home
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/t3mp3st/relay.env
+ExecStart=/usr/local/bin/node /usr/local/lib/t3mp3st/gpt-oss-relay.mjs
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
