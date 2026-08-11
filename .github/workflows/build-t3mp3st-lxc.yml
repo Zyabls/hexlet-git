@@ -59,6 +59,19 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Preserve failed build diagnostics on artifact branch
+        if: failure() && steps.build.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tail -n 400 "$GITHUB_WORKSPACE/build.log" > "$GITHUB_WORKSPACE/LAST_BUILD_FAILURE.log"
+          content="$(base64 -w0 "$GITHUB_WORKSPACE/LAST_BUILD_FAILURE.log")"
+          api_path="repos/$GITHUB_REPOSITORY/contents/trixie-image/LAST_BUILD_FAILURE.log"
+          current_sha="$(gh api -X GET "$api_path" -f ref="$GITHUB_REF_NAME" --jq .sha 2>/dev/null || true)"
+          args=(-X PUT -f 'message=[skip ci] Record failed Debian 13 image build' -f "content=$content" -f "branch=$GITHUB_REF_NAME")
+          [[ -z "$current_sha" ]] || args+=(-f "sha=$current_sha")
+          gh api "$api_path" "${args[@]}"
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
