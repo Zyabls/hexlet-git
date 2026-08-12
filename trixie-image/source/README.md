@@ -9,4 +9,4 @@ files are excluded.
 The builder accepts the archive only when
 `sha256sum -c t3mp3st-source.tar.gz.sha256` succeeds. Current SHA-256:
 
-`0737f37683051afe3c3d23e2aba1c126131fb0664585a7546bf574f8b142f491`
+`0e8ea85f97d41cf38ca76a0ae6a6c9a764f759c61afa6be75ceecd19289cd1f3`
