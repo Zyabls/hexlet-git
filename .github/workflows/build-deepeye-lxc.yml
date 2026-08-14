@@ -1,0 +1,76 @@
+name: Build Deep Eye Proxmox LXC
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - artifact/deepeye-proxmox-lxc-20260814
+    paths:
+      - deepeye-image/**
+      - .github/workflows/build-deepeye-lxc.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deepeye-lxc-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
+
+      - name: Static validation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck python3-yaml
+          shellcheck deepeye-image/*.sh
+          for script in deepeye-image/*.sh; do bash -n "$script"; done
+          python3 -m py_compile deepeye-image/deepeye-web.py
+          python3 - <<'PY'
+          import pathlib, yaml
+          yaml.safe_load(pathlib.Path('deepeye-image/deepeye-config.yaml').read_text())
+          print('config YAML: PASS')
+          PY
+          node --check deepeye-image/gpt-oss-relay.mjs
+          git diff --check
+
+      - name: Build verified LXC template
+        run: sudo deepeye-image/build.sh deepeye-image/out
+
+      - name: Verify release hashes and manifest
+        run: |
+          cd deepeye-image/out
+          sha256sum -c SHA256SUMS
+          jq -e '
+            .source_commit == "e98a361ee38ec65660ce585ff6789017a2d7a466" and
+            .model == "gpt-oss-120b" and
+            .os == "Debian 13.6"
+          ' BUILD-MANIFEST.json
+          test "$(find . -maxdepth 1 -name '*.tar.zst' | wc -l)" -eq 1
+
+      - name: Upload build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepeye-proxmox-lxc-${{ github.sha }}
+          path: deepeye-image/out/*
+          compression-level: 0
+          retention-days: 14
+
+      - name: Publish immutable GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: deepeye-lxc-gpt-oss-120b-20260814-r${{ github.run_number }}
+          name: Deep Eye Proxmox LXC 2026-08-14 (run ${{ github.run_number }})
+          body_path: deepeye-image/RELEASE_NOTES_RU.md
+          prerelease: true
+          files: deepeye-image/out/*
+          fail_on_unmatched_files: true

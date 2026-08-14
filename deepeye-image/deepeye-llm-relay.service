@@ -1,0 +1,21 @@
+[Unit]
+Description=Deep Eye locked gpt-oss-120b relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deepeye
+Group=deepeye
+Environment=HOME=/var/lib/deepeye/home
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/deepeye/relay.env
+ExecStart=/usr/local/bin/node /usr/local/lib/deepeye/gpt-oss-relay.mjs
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

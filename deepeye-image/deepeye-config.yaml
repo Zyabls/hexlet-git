@@ -1,0 +1,163 @@
+ai_providers:
+  openai:
+    enabled: true
+    api_key: relay-managed-local-only
+    base_url: http://127.0.0.1:18080/v1
+    model: gpt-oss-120b
+    lock_model: true
+    temperature: 1.0
+    top_p: 1.0
+    max_tokens: 4096
+    timeout: 300
+
+scanner:
+  target_url: ""
+  default_threads: 5
+  default_depth: 2
+  max_urls: 500
+  timeout: 15
+  scan_url_timeout: 90
+  user_agent: Deep-Eye/1.4.0
+  follow_redirects: true
+  verify_ssl: true
+  max_retries: 2
+  enable_recon: false
+  full_scan: false
+  quick_scan: false
+  ai_provider: openai
+  oast_callback_url: ""
+  proxy: ""
+  custom_headers: {}
+  cookies: {}
+
+vulnerability_scanner:
+  enabled_checks:
+    - sql_injection
+    - xss
+    - command_injection
+    - ssrf
+    - xxe
+    - path_traversal
+    - csrf
+    - authentication_bypass
+    - information_disclosure
+    - security_misconfiguration
+    - lfi
+    - rfi
+    - open_redirect
+    - cors_misconfiguration
+    - insecure_deserialization
+    - broken_authentication
+    - sensitive_data_exposure
+    - xml_injection
+    - ldap_injection
+    - ssti
+    - crlf_injection
+    - host_header_injection
+    - jwt_vulnerabilities
+    - api_vulnerabilities
+    - graphql_vulnerabilities
+  payload_generation:
+    use_ai: true
+    context_aware: true
+    cve_database: false
+    custom_wordlists: false
+    use_payload_obfuscation: false
+  testing:
+    thorough_mode: false
+    time_based_detection_delay: 5
+    blind_injection_attempts: 2
+
+reporting:
+  enabled: true
+  output_directory: /var/lib/deepeye/reports
+  output_filename: ""
+  default_format: html
+  formats: [html, json]
+  xlsx_interactive_install: false
+  include_sections: [executive_summary, vulnerability_details, remediation_guide, technical_details, reconnaissance_data, appendix]
+
+logging:
+  level: INFO
+  log_to_file: true
+  log_file: /var/lib/deepeye/logs/deep_eye.log
+  max_file_size: 10485760
+  backup_count: 5
+
+database:
+  enabled: true
+  type: sqlite
+  path: /var/lib/deepeye/data/deep_eye.db
+  auto_cleanup_days: 30
+
+rate_limiting:
+  enabled: true
+  requests_per_second: 5
+  burst_size: 10
+  delay_on_error: 2
+
+scope:
+  enabled: false
+  allowed_hosts: []
+  excluded_paths: ["/logout"]
+  allowed_ports: [80, 443, 8080, 8443]
+
+passive_mode: false
+advanced:
+  enable_javascript_rendering: true
+  screenshot_enabled: true
+  enable_browser_use_ai: false
+  browser_timeout: 120
+  browser_page_timeout: 15
+  browser_navigation_timeout: 15
+  exclude_extensions: [.jpg, .jpeg, .png, .gif, .css, .woff, .woff2, .ttf, .svg, .ico]
+  exclude_patterns: []
+  max_response_size: 5242880
+
+experimental:
+  enable_subdomain_scanning: false
+  aggressive_subdomain_enum: false
+  max_subdomains_to_scan: 20
+  enable_cve_matching: false
+  auto_update_cve_db: false
+
+reconnaissance:
+  enabled_modules: []
+templates:
+  enabled: true
+  template_directories: [/opt/deepeye/templates]
+  tag_filters: []
+  severity_filter: []
+ai_triage:
+  enabled: true
+  drop_false_positives: false
+  drop_threshold: 0.8
+  min_severity: high
+bug_bounty:
+  enabled: true
+  format: hackerone
+  min_severity: high
+  output_directory: /var/lib/deepeye/reports/bounty
+  one_file_per_vuln: true
+compliance:
+  # Upstream commit does not contain the required framework JSON files.
+  enabled: false
+  frameworks: [pci_dss, soc2, iso_27001]
+challenge_solver:
+  enabled: false
+intercepting_proxy:
+  enabled: false
+oast:
+  enabled: false
+notifications:
+  enabled: false
+plugin_manager:
+  enabled: false
+collaboration:
+  enabled: false
+rag:
+  enabled: false
+captcha:
+  enabled: false
+login_replay:
+  enabled: false

@@ -1,0 +1,12 @@
+[Unit]
+Description=Deep Eye first boot credentials and certificates
+Before=nginx.service deepeye.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/deepeye-firstboot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
