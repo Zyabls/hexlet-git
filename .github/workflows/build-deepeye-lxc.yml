@@ -105,6 +105,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: deepeye-lxc-gpt-oss-120b-20260814-r${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
           name: Deep Eye Proxmox LXC 2026-08-14 (run ${{ github.run_number }})
           body_path: deepeye-image/RELEASE_NOTES_RU.md
           prerelease: true
