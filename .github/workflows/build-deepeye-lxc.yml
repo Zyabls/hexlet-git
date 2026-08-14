@@ -67,7 +67,7 @@ jobs:
           git diff --check
 
       - name: Build verified LXC template
-        run: sudo deepeye-image/build.sh deepeye-image/out
+        run: sudo bash deepeye-image/build.sh deepeye-image/out
 
       - name: Verify release hashes and manifest
         run: |
