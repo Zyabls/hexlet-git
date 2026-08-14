@@ -127,6 +127,7 @@ install -m 0755 "$script_dir/deepeye-firstboot.sh" "$rootfs/usr/local/sbin/deepe
 install -m 0755 "$script_dir/configure-deepeye-llm.sh" "$rootfs/usr/local/sbin/configure-deepeye-llm"
 install -m 0755 "$script_dir/deepeye-set-password.sh" "$rootfs/usr/local/sbin/deepeye-set-password"
 install -m 0755 "$script_dir/deepeye-verify.sh" "$rootfs/usr/local/sbin/deepeye-verify"
+install -m 0644 "$script_dir/required-tools.json" "$rootfs/usr/local/share/deepeye-required-tools.json"
 install -m 0644 "$script_dir/sshd-deepeye.conf" "$rootfs/etc/ssh/sshd_config.d/99-deepeye.conf"
 rm -f "$rootfs/etc/nginx/sites-enabled/default"
 install -m 0644 "$script_dir/nginx-deepeye.conf" "$rootfs/etc/nginx/conf.d/deepeye.conf"
@@ -182,11 +183,12 @@ tar --sort=name --mtime="@$source_date_epoch" --clamp-mtime --numeric-owner \
 echo '[9/9] Release evidence and checksums'
 image_sha="$(sha256sum "$out_dir/$image_name" | cut -d' ' -f1)"
 cp "$rootfs/usr/local/share/deepeye-python-lock.txt" "$out_dir/python-lock.txt"
+cp "$rootfs/usr/local/share/deepeye-required-tools.json" "$out_dir/required-tools.json"
 cat > "$out_dir/BUILD-MANIFEST.json" <<EOF
 {"schema":1,"image":"$image_name","sha256":"$image_sha","base":"$base_name","base_sha512":"$base_sha512","source_repository":"https://github.com/zakirkun/deep-eye","source_commit":"$source_commit","source_sha512":"$source_sha512","node":"$node_version","python":"$(chroot "$rootfs" python3 --version | awk '{print $2}')","model":"gpt-oss-120b","os":"Debian 13.6","build_epoch":$source_date_epoch}
 EOF
 cp "$script_dir/README_RU.md" "$script_dir/deploy-deepeye.sh" "$script_dir/deepeye-verify.sh" \
   "$script_dir/configure-deepeye-llm.sh" "$script_dir/deepeye-set-password.sh" "$out_dir/"
-(cd "$out_dir" && sha256sum "$image_name" BUILD-MANIFEST.json python-lock.txt \
+(cd "$out_dir" && sha256sum "$image_name" BUILD-MANIFEST.json python-lock.txt required-tools.json \
   deploy-deepeye.sh deepeye-verify.sh configure-deepeye-llm.sh deepeye-set-password.sh > SHA256SUMS)
 echo "Built: $out_dir/$image_name"

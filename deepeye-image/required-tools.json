@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "profile": "deepeye-1.4.0-supported",
+  "commands": [
+    "chromium",
+    "curl",
+    "dig",
+    "file",
+    "git",
+    "host",
+    "jq",
+    "nmap",
+    "node",
+    "npm",
+    "openssl",
+    "pandoc",
+    "pdftotext",
+    "python3",
+    "rg",
+    "weasyprint",
+    "whois"
+  ],
+  "pythonImports": [
+    "aiohttp",
+    "bs4",
+    "cryptography",
+    "httpx",
+    "lxml",
+    "magic",
+    "numpy",
+    "openai",
+    "openpyxl",
+    "pandas",
+    "playwright",
+    "requests",
+    "rich",
+    "selenium",
+    "sklearn",
+    "sqlalchemy",
+    "yaml"
+  ],
+  "optionalDisabled": [
+    "compliance-framework-data",
+    "intercepting-proxy/mitmweb",
+    "OAST",
+    "challenge-solver",
+    "plugins",
+    "collaboration"
+  ]
+}

@@ -67,7 +67,19 @@ jobs:
           git diff --check
 
       - name: Build verified LXC template
-        run: sudo bash deepeye-image/build.sh deepeye-image/out
+        run: |
+          set +e
+          sudo bash deepeye-image/build.sh deepeye-image/out 2>&1 | tee deepeye-build.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if (( status != 0 )); then
+            detail="$(tail -n 30 deepeye-build.log)"
+            detail="${detail//'%'/'%25'}"
+            detail="${detail//$'\r'/'%0D'}"
+            detail="${detail//$'\n'/'%0A'}"
+            echo "::error title=Deep Eye image build failed::$detail"
+            exit "$status"
+          fi
 
       - name: Verify release hashes and manifest
         run: |

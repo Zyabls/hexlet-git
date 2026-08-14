@@ -52,6 +52,11 @@ unset verify_password
 check 'upstream source commit marker' grep -Fq 'e98a361ee38ec65660ce585ff6789017a2d7a466' /usr/local/lib/deepeye/deepeye-web.py
 check 'OpenAI-compatible regression' runuser -u deepeye -- env HOME=/var/lib/deepeye/home PATH=/opt/deepeye/venv/bin:/usr/bin:/bin bash -lc 'cd /opt/deepeye && pytest -q tests/test_openai_compatible_provider.py'
 check 'model lock configured' bash -c "grep -Fq 'model: gpt-oss-120b' /etc/deepeye/config.yaml && grep -Fq 'lock_model: true' /etc/deepeye/config.yaml"
+while IFS= read -r tool; do
+  check "required command: $tool" runuser -u deepeye -- env PATH=/opt/deepeye/venv/bin:/usr/local/bin:/usr/bin:/bin which "$tool"
+done < <(jq -r '.commands[]' /usr/local/share/deepeye-required-tools.json)
+check 'required Python modules import' runuser -u deepeye -- env HOME=/var/lib/deepeye/home /opt/deepeye/venv/bin/python -c 'import importlib,json; p=json.load(open("/usr/local/share/deepeye-required-tools.json")); [importlib.import_module(name) for name in p["pythonImports"]]'
+check 'Deep Eye CLI starts' runuser -u deepeye -- env HOME=/var/lib/deepeye/home /opt/deepeye/venv/bin/python /opt/deepeye/deep_eye.py --version
 check 'browser runtime installed' runuser -u deepeye -- env PLAYWRIGHT_BROWSERS_PATH=/opt/deepeye/playwright /opt/deepeye/venv/bin/python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]); print(b.version); b.close(); p.stop()'
 
 fixture="$run_dir/fixture"

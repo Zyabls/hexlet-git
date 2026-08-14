@@ -15,6 +15,8 @@
 - безопасная установка на выбранный Proxmox storage и новый свободный IP;
 - acceptance verifier: systemd, nginx, proxy guards, browser, local scan,
   persistent report/evidence, optional live LLM и restart/load stability.
+- manifest и runtime gate для 17 системных команд и 17 Python-imports,
+  проверяемых с тем же PATH/HOME, что использует сервис.
 
 Изменение upstream минимально: `openai-compatible.patch` добавляет configurable
 base URL, timeout, top_p и блокировку модели. Исходный Deep Eye остаётся CLI;
