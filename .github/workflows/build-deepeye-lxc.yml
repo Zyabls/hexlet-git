@@ -21,26 +21,48 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Free runner disk space
         run: |
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           df -h /
 
-      - name: Static validation
+      - name: Install validation dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck python3-yaml
+
+      - name: ShellCheck
+        run: |
           shellcheck deepeye-image/*.sh
+
+      - name: Bash syntax
+        run: |
           for script in deepeye-image/*.sh; do bash -n "$script"; done
+
+      - name: Python wrapper syntax
+        run: |
           python3 -m py_compile deepeye-image/deepeye-web.py
+
+      - name: Production YAML model lock
+        run: |
           python3 - <<'PY'
-          import pathlib, yaml
-          yaml.safe_load(pathlib.Path('deepeye-image/deepeye-config.yaml').read_text())
-          print('config YAML: PASS')
+          import pathlib
+          import yaml
+          config = yaml.safe_load(pathlib.Path('deepeye-image/deepeye-config.yaml').read_text())
+          provider = config['ai_providers']['openai']
+          assert provider['model'] == 'gpt-oss-120b'
+          assert provider['lock_model'] is True
+          assert config['compliance']['enabled'] is False
           PY
+
+      - name: Node relay syntax
+        run: |
           node --check deepeye-image/gpt-oss-relay.mjs
+
+      - name: Worktree whitespace
+        run: |
           git diff --check
 
       - name: Build verified LXC template
