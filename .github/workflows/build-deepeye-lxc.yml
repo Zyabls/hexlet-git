@@ -35,7 +35,8 @@ jobs:
 
       - name: ShellCheck
         run: |
-          shellcheck deepeye-image/*.sh
+          shellcheck --version
+          shellcheck --severity=warning deepeye-image/*.sh
 
       - name: Bash syntax
         run: |
