@@ -50,7 +50,7 @@ rm -f -- "$curl_config"
 unset verify_password
 
 check 'upstream source commit marker' grep -Fq 'e98a361ee38ec65660ce585ff6789017a2d7a466' /usr/local/lib/deepeye/deepeye-web.py
-check 'OpenAI-compatible regression' runuser -u deepeye -- env HOME=/var/lib/deepeye/home PATH=/opt/deepeye/venv/bin:/usr/bin:/bin bash -lc 'cd /opt/deepeye && pytest -q tests/test_openai_compatible_provider.py'
+check 'OpenAI-compatible regression' runuser -u deepeye -- env HOME=/var/lib/deepeye/home PATH=/opt/deepeye/venv/bin:/usr/bin:/bin bash -c 'cd /opt/deepeye && /opt/deepeye/venv/bin/pytest -q tests/test_openai_compatible_provider.py'
 check 'model lock configured' bash -c "grep -Fq 'model: gpt-oss-120b' /etc/deepeye/config.yaml && grep -Fq 'lock_model: true' /etc/deepeye/config.yaml"
 while IFS= read -r tool; do
   check "required command: $tool" runuser -u deepeye -- env PATH=/opt/deepeye/venv/bin:/usr/local/bin:/usr/bin:/bin which "$tool"

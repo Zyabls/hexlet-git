@@ -21,7 +21,9 @@ work_dir="$(mktemp -d -t deepeye-trixie.XXXXXXXX)"
 rootfs="$work_dir/rootfs"
 downloads="$work_dir/downloads"
 mounts_active=0
+fixture_pid=''
 cleanup() {
+  [[ -z "$fixture_pid" ]] || kill "$fixture_pid" >/dev/null 2>&1 || true
   if (( mounts_active )); then
     mountpoint -q "$rootfs/dev" && umount -l "$rootfs/dev" || true
     mountpoint -q "$rootfs/sys" && umount -l "$rootfs/sys" || true
@@ -103,10 +105,44 @@ echo '[4/9] Applicable upstream tests, compatibility regression and CLI smoke'
 # The pinned upstream archive does not contain utils/compliance/frameworks/*.json,
 # although test_compliance_mapping.py requires those files. Compliance is disabled
 # in the supported profile; every other committed upstream test remains a gate.
-run_as_deepeye bash -lc 'cd /opt/deepeye && pytest -q tests --ignore=tests/test_compliance_mapping.py'
+run_as_deepeye bash -c 'cd /opt/deepeye && /opt/deepeye/venv/bin/pytest -q tests --ignore=tests/test_compliance_mapping.py'
 run_as_deepeye /opt/deepeye/venv/bin/python /opt/deepeye/deep_eye.py --version
 run_as_deepeye /opt/deepeye/venv/bin/python -m py_compile \
   /opt/deepeye/deep_eye.py /opt/deepeye/ai_providers/openai_provider.py
+
+echo '[4b/9] Bounded Deep Eye CLI scan and HTML/JSON report smoke'
+mkdir -p "$work_dir/fixture-www" "$rootfs/tmp/deepeye-build-reports"
+install -d -m 0755 "$rootfs/etc/deepeye"
+install -m 0644 "$script_dir/deepeye-config.yaml" "$rootfs/etc/deepeye/config.yaml"
+printf '<html><title>Deep Eye build fixture</title><a href="/about">about</a></html>\n' > "$work_dir/fixture-www/index.html"
+printf '<html><title>About</title><p>bounded build fixture</p></html>\n' > "$work_dir/fixture-www/about"
+python3 -m http.server 18082 --bind 127.0.0.1 --directory "$work_dir/fixture-www" > "$work_dir/fixture-http.log" 2>&1 &
+fixture_pid=$!
+for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:18082/ >/dev/null && break; sleep 0.2; done
+chroot "$rootfs" /opt/deepeye/venv/bin/python - <<'PY'
+import yaml
+source = yaml.safe_load(open('/etc/deepeye/config.yaml', encoding='utf-8'))
+source['vulnerability_scanner']['payload_generation']['use_ai'] = False
+source['vulnerability_scanner']['enabled_checks'] = ['information_disclosure', 'security_misconfiguration']
+source['scanner'].update({'default_threads': 2, 'default_depth': 1, 'max_urls': 5, 'enable_recon': False})
+source['advanced'].update({'enable_javascript_rendering': False, 'screenshot_enabled': False})
+source['templates']['enabled'] = False
+source['ai_triage']['enabled'] = False
+source['bug_bounty']['enabled'] = False
+source['reporting'].update({'output_directory': '/tmp/deepeye-build-reports', 'formats': ['html', 'json']})
+source['logging'].update({'log_file': '/tmp/deepeye-build-smoke.log'})
+source['database']['enabled'] = False
+yaml.safe_dump(source, open('/tmp/deepeye-build-smoke.yaml', 'w', encoding='utf-8'), sort_keys=False)
+PY
+chown -R "$deep_uid:$deep_gid" "$rootfs/tmp/deepeye-build-reports" "$rootfs/tmp/deepeye-build-smoke.yaml"
+run_as_deepeye timeout 300 /opt/deepeye/venv/bin/python /opt/deepeye/deep_eye.py --no-banner \
+  --config /tmp/deepeye-build-smoke.yaml --url http://127.0.0.1:18082 --formats html,json
+find "$rootfs/tmp/deepeye-build-reports" -type f -name '*.html' | grep -q .
+find "$rootfs/tmp/deepeye-build-reports" -type f -name '*.json' | grep -q .
+grep -Rqs '127.0.0.1:18082' "$rootfs/tmp/deepeye-build-reports"
+kill "$fixture_pid" >/dev/null 2>&1 || true
+wait "$fixture_pid" 2>/dev/null || true
+fixture_pid=''
 rm -rf "$rootfs/opt/deepeye/reports" "$rootfs/opt/deepeye/logs" "$rootfs/opt/deepeye/data"
 ln -s /var/lib/deepeye/reports "$rootfs/opt/deepeye/reports"
 ln -s /var/lib/deepeye/logs "$rootfs/opt/deepeye/logs"
@@ -185,7 +221,7 @@ image_sha="$(sha256sum "$out_dir/$image_name" | cut -d' ' -f1)"
 cp "$rootfs/usr/local/share/deepeye-python-lock.txt" "$out_dir/python-lock.txt"
 cp "$rootfs/usr/local/share/deepeye-required-tools.json" "$out_dir/required-tools.json"
 cat > "$out_dir/BUILD-MANIFEST.json" <<EOF
-{"schema":1,"image":"$image_name","sha256":"$image_sha","base":"$base_name","base_sha512":"$base_sha512","source_repository":"https://github.com/zakirkun/deep-eye","source_commit":"$source_commit","source_sha512":"$source_sha512","node":"$node_version","python":"$(chroot "$rootfs" python3 --version | awk '{print $2}')","model":"gpt-oss-120b","os":"Debian 13.6","build_epoch":$source_date_epoch}
+{"schema":1,"image":"$image_name","sha256":"$image_sha","base":"$base_name","base_sha512":"$base_sha512","source_repository":"https://github.com/zakirkun/deep-eye","source_commit":"$source_commit","source_sha512":"$source_sha512","node":"$node_version","python":"$(chroot "$rootfs" python3 --version | awk '{print $2}')","model":"gpt-oss-120b","os":"Debian 13.6","build_smoke":"passed","build_epoch":$source_date_epoch}
 EOF
 cp "$script_dir/README_RU.md" "$script_dir/deploy-deepeye.sh" "$script_dir/deepeye-verify.sh" \
   "$script_dir/configure-deepeye-llm.sh" "$script_dir/deepeye-set-password.sh" "$out_dir/"

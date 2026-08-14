@@ -88,7 +88,8 @@ jobs:
           jq -e '
             .source_commit == "e98a361ee38ec65660ce585ff6789017a2d7a466" and
             .model == "gpt-oss-120b" and
-            .os == "Debian 13.6"
+            .os == "Debian 13.6" and
+            .build_smoke == "passed"
           ' BUILD-MANIFEST.json
           test "$(find . -maxdepth 1 -name '*.tar.zst' | wc -l)" -eq 1
 
