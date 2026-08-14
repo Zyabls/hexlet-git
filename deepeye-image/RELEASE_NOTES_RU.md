@@ -1,28 +1,15 @@
-# Deep Eye Proxmox LXC — 2026-08-14
+# Deep Eye CLI-only Proxmox LXC — 2026-08-14
 
-Первый релиз отдельного контейнера для `zakirkun/deep-eye` 1.4.0.
+Исправленный CLI-only образ Deep Eye 1.4.0:
 
-Ключевые свойства:
+- полностью удалены nginx, web-wrapper и listeners 80/443/3333;
+- добавлена команда `/usr/local/bin/deepeye` с правильным venv/config/PATH;
+- `deepadmin` получил group-write доступ к persistent reports/logs/evidence;
+- реальный scan и tool checks выполняются в окружении SSH-пользователя;
+- deploy теперь показывает точную строку и команду ошибки с журналом firstboot;
+- `gpt-oss-120b` остаётся жёстко зафиксирован через loopback relay;
+- 17 системных команд, 17 Python imports и Chromium проходят runtime gate;
+- отчёты содержат hostname/IP цели в имени и теле.
 
-- официальный Proxmox Debian 13.6, unprivileged LXC;
-- воспроизводимый source pin `e98a361ee38ec65660ce585ff6789017a2d7a466`;
-- проверенная OpenAI-compatible интеграция и hard lock `gpt-oss-120b`;
-- nginx HTTPS + bcrypt Basic Auth, backend/relay только на loopback;
-- отдельный пароль `deepadmin`; старые T3MP3ST credentials не переносятся;
-- web-очередь с обязательным подтверждением авторизации цели;
-- постоянные state/log/report directories и SHA-256 evidence manifests;
-- отчёты и evidence-файлы содержат slug исследуемого ресурса;
-- безопасная установка на выбранный Proxmox storage и новый свободный IP;
-- acceptance verifier: systemd, nginx, proxy guards, browser, local scan,
-  persistent report/evidence, optional live LLM и restart/load stability.
-- manifest и runtime gate для 17 системных команд и 17 Python-imports,
-  проверяемых с тем же PATH/HOME, что использует сервис.
-
-Изменение upstream минимально: `openai-compatible.patch` добавляет configurable
-base URL, timeout, top_p и блокировку модели. Исходный Deep Eye остаётся CLI;
-web wrapper относится только к deployment-пакету.
-
-Ограничение профиля: compliance отключён, потому что upstream commit не содержит
-обязательные JSON framework-файлы. OAST/challenge/proxy/plugins/collaboration
-также отключены, пока администратор не настроит и отдельно не проверит
-необходимые доверенные сервисы.
+Source pin: `e98a361ee38ec65660ce585ff6789017a2d7a466`.
+Base: официальный Proxmox Debian 13.6, unprivileged LXC.

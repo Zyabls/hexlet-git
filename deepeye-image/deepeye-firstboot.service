@@ -1,6 +1,6 @@
 [Unit]
-Description=Deep Eye first boot credentials and certificates
-Before=nginx.service deepeye.service
+Description=Deep Eye first boot SSH and storage setup
+Before=ssh.service deepeye-llm-relay.service
 After=local-fs.target
 
 [Service]

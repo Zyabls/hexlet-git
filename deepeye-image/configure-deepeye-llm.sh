@@ -50,7 +50,7 @@ chown root:deepeye "$temporary"
 chmod 0640 "$temporary"
 mv -f -- "$temporary" /etc/deepeye/relay.env
 trap - EXIT
-systemctl restart deepeye-llm-relay.service deepeye.service
+systemctl restart deepeye-llm-relay.service
 for _ in $(seq 1 30); do
   if curl -fsS http://127.0.0.1:18080/v1/models >/tmp/deepeye-models.json; then break; fi
   sleep 1

@@ -9,6 +9,7 @@ Run on a Proxmox VE node as root:
 Required:
   --ip CIDR                 A NEW, unused address, for example 192.168.1.242/24
   --gateway IP              Gateway for the container network
+  --ssh-key FILE            Public key installed for root and deepadmin
 
 Options:
   --bridge NAME             Default: vmbr0
@@ -17,8 +18,6 @@ Options:
   --hostname NAME           Default: deepeye-gptoss
   --dns IP                  Proxmox nameserver setting
   --search DOMAIN           Proxmox search domain setting
-  --ssh-key FILE            Public key installed for root/deepadmin
-  --web-password-file FILE  Root-readable file, at least 12 characters
   --llm-key-file FILE       Root-readable gpt-oss API key file
   --llm-upstream URL        Default: https://llm.enplus.group/v1
   --llm-tls MODE            strict, custom-ca or insecure-host
@@ -38,7 +37,7 @@ image="$(readlink -f -- "$1")"
 ctid=$2
 shift 2
 ip_cidr=''; gateway=''; bridge=vmbr0; storage=local-lvm; template_storage=local
-hostname=deepeye-gptoss; dns=''; search=''; ssh_key=''; web_password_file=''; llm_key_file=''
+hostname=deepeye-cli-gptoss; dns=''; search=''; ssh_key=''; llm_key_file=''
 llm_upstream=https://llm.enplus.group/v1; llm_tls=strict; llm_ca=''
 while (($#)); do
   case "$1" in
@@ -51,7 +50,6 @@ while (($#)); do
     --dns) dns=${2:-}; shift 2 ;;
     --search) search=${2:-}; shift 2 ;;
     --ssh-key) ssh_key=${2:-}; shift 2 ;;
-    --web-password-file) web_password_file=${2:-}; shift 2 ;;
     --llm-key-file) llm_key_file=${2:-}; shift 2 ;;
     --llm-upstream) llm_upstream=${2:-}; shift 2 ;;
     --llm-tls) llm_tls=${2:-}; shift 2 ;;
@@ -67,7 +65,8 @@ done
 [[ -n "$gateway" && "$gateway" != *[[:space:]]* ]] || { echo 'A valid --gateway is required.' >&2; exit 2; }
 [[ "$bridge" =~ ^[A-Za-z0-9_.:-]+$ && "$hostname" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$ ]] || { echo 'Invalid bridge or hostname.' >&2; exit 2; }
 [[ "$llm_tls" =~ ^(strict|custom-ca|insecure-host)$ ]] || { echo 'Invalid --llm-tls.' >&2; exit 2; }
-for candidate in "$ssh_key" "$web_password_file" "$llm_key_file" "$llm_ca"; do
+[[ -n "$ssh_key" && -s "$ssh_key" ]] || { echo 'A non-empty --ssh-key public key file is required.' >&2; exit 2; }
+for candidate in "$ssh_key" "$llm_key_file" "$llm_ca"; do
   [[ -z "$candidate" || -f "$candidate" ]] || { echo "Input file not found: $candidate" >&2; exit 2; }
 done
 [[ "$llm_tls" != custom-ca || -n "$llm_ca" ]] || { echo '--llm-ca is required for custom-ca.' >&2; exit 2; }
@@ -88,30 +87,36 @@ fi
 net0="name=eth0,bridge=${bridge},ip=${ip_cidr},gw=${gateway},firewall=1,type=veth"
 create_args=("$ctid" "$template_volume" --hostname "$hostname" --unprivileged 1
   --cores 4 --memory 8192 --swap 2048 --rootfs "${storage}:100"
-  --net0 "$net0" --features keyctl=1 --onboot 1 --startup order=30)
-[[ -z "$ssh_key" ]] || create_args+=(--ssh-public-keys "$ssh_key")
+  --net0 "$net0" --features keyctl=1 --onboot 1 --startup order=30
+  --ssh-public-keys "$ssh_key")
 
 echo "Creating unprivileged CT $ctid on $storage with $ip_cidr."
 pct create "${create_args[@]}"
 [[ -z "$dns" ]] || pct set "$ctid" --nameserver "$dns"
 [[ -z "$search" ]] || pct set "$ctid" --searchdomain "$search"
 
-rollback() {
-  echo "Deployment failed. CT $ctid is retained for inspection and is not deleted automatically." >&2
+deployment_failed() {
+  status=$?
+  line=$1
+  command=$2
+  trap - ERR
+  echo "Deployment failed at line $line: $command" >&2
+  echo "CT $ctid is retained for inspection and is not deleted automatically." >&2
+  pct status "$ctid" >&2 || true
+  pct exec "$ctid" -- systemctl --failed --no-pager >&2 || true
+  pct exec "$ctid" -- journalctl -u deepeye-firstboot.service -b --no-pager -n 80 >&2 || true
+  exit "$status"
 }
-trap rollback ERR
+trap 'deployment_failed "$LINENO" "$BASH_COMMAND"' ERR
 pct start "$ctid"
+system_ready=0
 for _ in $(seq 1 60); do
-  pct exec "$ctid" -- systemctl is-system-running --wait >/dev/null 2>&1 && break
+  system_state="$(pct exec "$ctid" -- systemctl is-system-running 2>/dev/null || true)"
+  if [[ "$system_state" == running || "$system_state" == degraded ]]; then system_ready=1; break; fi
   sleep 2
 done
+(( system_ready == 1 )) || { echo 'Container systemd did not become ready in 120 seconds.' >&2; exit 4; }
 pct exec "$ctid" -- systemctl start deepeye-firstboot.service
-
-if [[ -n "$web_password_file" ]]; then
-  pct push "$ctid" "$web_password_file" /root/.deepeye-web-password --perms 0600
-  pct exec "$ctid" -- /usr/local/sbin/deepeye-set-password /root/.deepeye-web-password
-  pct exec "$ctid" -- rm -f /root/.deepeye-web-password
-fi
 if [[ -n "$llm_ca" ]]; then
   pct push "$ctid" "$llm_ca" /etc/deepeye/corporate-ca.pem --perms 0644
 fi
@@ -123,15 +128,11 @@ if [[ -n "$llm_key_file" ]]; then
   pct exec "$ctid" -- rm -f /root/.deepeye-llm-key
 fi
 
-pct exec "$ctid" -- nginx -t
 pct exec "$ctid" -- /usr/local/sbin/deepeye-verify
 trap - ERR
-echo "CT $ctid is ready: https://${ip_cidr%/*}/"
-if [[ -z "$web_password_file" ]]; then
-  echo "Initial random credentials: pct exec $ctid -- cat /root/deepeye-initial-credentials.txt"
-else
-  echo 'Web user: deepadmin (password was read from your file).'
-fi
+echo "CT $ctid is ready for CLI use."
+echo "SSH: ssh deepadmin@${ip_cidr%/*}"
+echo "Scan: deepeye --url https://authorized.example --formats html,json"
 if [[ -z "$llm_key_file" ]]; then
   echo "Configure LLM later: pct push $ctid KEYFILE /root/key && pct exec $ctid -- configure-deepeye-llm --key-file /root/key"
 fi

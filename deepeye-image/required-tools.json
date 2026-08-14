@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "profile": "deepeye-1.4.0-supported",
+  "profile": "deepeye-1.4.0-cli-supported",
   "commands": [
     "chromium",
     "curl",

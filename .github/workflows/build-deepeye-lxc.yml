@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - artifact/deepeye-proxmox-lxc-20260814
+      - artifact/deepeye-proxmox-lxc-cli-20260814
     paths:
       - deepeye-image/**
       - .github/workflows/build-deepeye-lxc.yml
@@ -41,10 +41,6 @@ jobs:
       - name: Bash syntax
         run: |
           for script in deepeye-image/*.sh; do bash -n "$script"; done
-
-      - name: Python wrapper syntax
-        run: |
-          python3 -m py_compile deepeye-image/deepeye-web.py
 
       - name: Production YAML model lock
         run: |
@@ -89,6 +85,8 @@ jobs:
             .source_commit == "e98a361ee38ec65660ce585ff6789017a2d7a466" and
             .model == "gpt-oss-120b" and
             .os == "Debian 13.6" and
+            .access == "ssh-cli-only" and
+            .nginx == false and
             .build_smoke == "passed"
           ' BUILD-MANIFEST.json
           test "$(find . -maxdepth 1 -name '*.tar.zst' | wc -l)" -eq 1
@@ -96,7 +94,7 @@ jobs:
       - name: Upload build evidence
         uses: actions/upload-artifact@v4
         with:
-          name: deepeye-proxmox-lxc-${{ github.sha }}
+          name: deepeye-cli-proxmox-lxc-${{ github.sha }}
           path: deepeye-image/out/*
           compression-level: 0
           retention-days: 14
@@ -104,9 +102,9 @@ jobs:
       - name: Publish immutable GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: deepeye-lxc-gpt-oss-120b-20260814-r${{ github.run_number }}
+          tag_name: deepeye-cli-lxc-gpt-oss-120b-20260814-r${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: Deep Eye Proxmox LXC 2026-08-14 (run ${{ github.run_number }})
+          name: Deep Eye CLI-only Proxmox LXC 2026-08-14 (run ${{ github.run_number }})
           body_path: deepeye-image/RELEASE_NOTES_RU.md
           prerelease: true
           files: deepeye-image/out/*

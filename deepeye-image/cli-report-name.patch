@@ -1,0 +1,20 @@
+diff --git a/deep_eye.py b/deep_eye.py
+index ed71468..1bf02a1 100755
+--- a/deep_eye.py
++++ b/deep_eye.py
+@@ -332,7 +332,14 @@ def main():
+             # Generate stem (without extension) once, reused across formats
+             from datetime import datetime
++            from urllib.parse import urlsplit
+             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+-            domain = Path(target_url).stem.replace(':', '_')
++            parsed_target = urlsplit(target_url)
++            resource = parsed_target.hostname or 'target'
++            if parsed_target.port:
++                resource = f"{resource}_{parsed_target.port}"
++            domain = ''.join(
++                char if char.isalnum() or char in '._-' else '_' for char in resource
++            )
+ 
+             if output_filename:
+                 # User-specified filename: strip extension, use as stem
