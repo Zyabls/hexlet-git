@@ -76,13 +76,11 @@ cp "$script_dir/cli-report-name.patch" "$rootfs/tmp/cli-report-name.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/cli-report-name.patch'
 cp "$script_dir/ai-payload-generator.patch" "$rootfs/tmp/ai-payload-generator.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/ai-payload-generator.patch'
-cp "$script_dir/playwright-cleanup.patch" "$rootfs/tmp/playwright-cleanup.patch"
-chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/playwright-cleanup.patch'
-cp "$script_dir/browser-evidence.patch" "$rootfs/tmp/browser-evidence.patch"
-chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/browser-evidence.patch'
+cp "$script_dir/smart-browser.patch" "$rootfs/tmp/smart-browser.patch"
+chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/smart-browser.patch'
 cp "$script_dir/report-evidence.patch" "$rootfs/tmp/report-evidence.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/report-evidence.patch'
-rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch" "$rootfs/tmp/playwright-cleanup.patch" "$rootfs/tmp/browser-evidence.patch" "$rootfs/tmp/report-evidence.patch"
+rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch" "$rootfs/tmp/smart-browser.patch" "$rootfs/tmp/report-evidence.patch"
 # Keep the tested generator in this repository as the runtime source of truth,
 # so the same hotfix can also be copied into an already deployed container.
 install -m 0644 "$script_dir/ai_payload_generator.py" "$rootfs/opt/deepeye/core/ai_payload_generator.py"
