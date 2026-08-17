@@ -125,7 +125,7 @@ echo '[4/9] Applicable upstream tests, compatibility regression and CLI smoke'
 # The pinned upstream archive does not contain utils/compliance/frameworks/*.json,
 # although test_compliance_mapping.py requires those files. Compliance is disabled
 # in the supported profile; every other committed upstream test remains a gate.
-run_as_deepeye bash -c 'cd /opt/deepeye && /opt/deepeye/venv/bin/pytest -q tests --ignore=tests/test_compliance_mapping.py'
+run_as_deepeye bash -c 'cd /opt/deepeye && /opt/deepeye/venv/bin/python -m pytest -q tests --ignore=tests/test_compliance_mapping.py'
 run_as_deepeye /opt/deepeye/venv/bin/python /opt/deepeye/deep_eye.py --version
 run_as_deepeye /opt/deepeye/venv/bin/python -m py_compile \
   /opt/deepeye/deep_eye.py /opt/deepeye/ai_providers/openai_provider.py

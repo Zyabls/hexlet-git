@@ -97,7 +97,7 @@ done < <(jq -r '.commands[]' /usr/local/share/deepeye-required-tools.json)
 check 'required Python imports from SSH user' as_admin /opt/deepeye/venv/bin/python -c \
   'import importlib,json; p=json.load(open("/usr/local/share/deepeye-required-tools.json")); [importlib.import_module(name) for name in p["pythonImports"]]'
 check 'OpenAI-compatible regression' as_admin bash -c \
-  'cd /opt/deepeye && /opt/deepeye/venv/bin/pytest -q tests/test_openai_compatible_provider.py'
+  'cd /opt/deepeye && /opt/deepeye/venv/bin/python -m pytest -q tests/test_openai_compatible_provider.py'
 check 'Chromium launches from SSH user context' as_admin /opt/deepeye/venv/bin/python -c \
   'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]); print(b.version); b.close(); p.stop()'
 
