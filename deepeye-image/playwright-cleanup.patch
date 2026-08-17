@@ -1,0 +1,100 @@
+diff --git a/modules/browser_automation/smart_tester.py b/modules/browser_automation/smart_tester.py
+index afab9d5..fe2e444 100644
+--- a/modules/browser_automation/smart_tester.py
++++ b/modules/browser_automation/smart_tester.py
+@@ -15,11 +15,6 @@ logger = get_logger(__name__)
+ class SmartBrowserTester:
+     """Browser-based vulnerability testing with Playwright."""
+ 
+-    # Class-level browser pool - shared across instances
+-    _playwright = None
+-    _browser = None
+-    _instance_count = 0
+-
+     def __init__(self, config: Dict):
+         """Initialize smart browser tester."""
+         self.config = config
+@@ -28,25 +23,24 @@ class SmartBrowserTester:
+         self.screenshots = []
+         self.page = None
+         self.context = None
+-        SmartBrowserTester._instance_count += 1
++        self._playwright = None
++        self._browser = None
+ 
+     async def initialize_browser(self):
+-        """Initialize Playwright browser (reuses shared browser instance)."""
++        """Initialize an isolated Playwright browser for this tester."""
+         try:
+             from playwright.async_api import async_playwright
+ 
+-            # Reuse class-level browser if available
+-            if SmartBrowserTester._browser is None or not SmartBrowserTester._browser.is_connected():
+-                if SmartBrowserTester._playwright is None:
+-                    SmartBrowserTester._playwright = await async_playwright().start()
+-                SmartBrowserTester._browser = await SmartBrowserTester._playwright.chromium.launch(
++            if self._browser is None or not self._browser.is_connected():
++                if self._playwright is None:
++                    self._playwright = await async_playwright().start()
++                self._browser = await self._playwright.chromium.launch(
+                     headless=True,
+                     args=['--no-sandbox', '--disable-setuid-sandbox']
+                 )
+-                logger.info("Playwright browser launched (shared pool)")
++                logger.info("Playwright browser launched")
+ 
+-            # Create a fresh context per tester instance (lightweight)
+-            self.context = await SmartBrowserTester._browser.new_context(
++            self.context = await self._browser.new_context(
+                 viewport={'width': 1920, 'height': 1080},
+                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+             )
+@@ -61,30 +55,23 @@ class SmartBrowserTester:
+             return False
+ 
+     async def close_browser(self):
+-        """Close this instance's context (browser stays alive for reuse)."""
+-        try:
+-            if self.page:
+-                await self.page.close()
+-                self.page = None
+-            if self.context:
+-                await self.context.close()
+-                self.context = None
+-            logger.debug("Browser context closed")
+-        except Exception as e:
+-            logger.error(f"Error closing browser context: {e}")
+-
+-    @classmethod
+-    async def shutdown_pool(cls):
+-        """Shutdown the shared browser pool. Call once at scan end."""
+-        try:
+-            if cls._browser:
+-                await cls._browser.close()
+-                cls._browser = None
+-            if cls._playwright:
+-                await cls._playwright.stop()
+-                cls._playwright = None
+-            logger.info("Browser pool shut down")
+-        except Exception as e:
+-            logger.error(f"Error shutting down browser pool: {e}")
++        """Close all Playwright resources created by this tester."""
++        resources = (
++            ("page", "close"),
++            ("context", "close"),
++            ("_browser", "close"),
++            ("_playwright", "stop"),
++        )
++        for attribute, method in resources:
++            resource = getattr(self, attribute)
++            if resource is None:
++                continue
++            try:
++                await getattr(resource, method)()
++            except Exception as e:
++                logger.error(f"Error closing Playwright {attribute}: {e}")
++            finally:
++                setattr(self, attribute, None)
++        logger.debug("Browser resources closed")
+     
+     async def take_screenshot(self, title: str = "screenshot", page=None) -> Optional[str]:
