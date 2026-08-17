@@ -1,0 +1,24 @@
+diff --git a/core/report_generator.py b/core/report_generator.py
+index f895730..738b11a 100644
+--- a/core/report_generator.py
++++ b/core/report_generator.py
+@@ -7,7 +7,7 @@ import json
+ from datetime import datetime
+ from pathlib import Path
+ from typing import Dict, List
+-from jinja2 import Template
++from jinja2 import Environment, select_autoescape
+ from utils.logger import get_logger
+ 
+ logger = get_logger(__name__)
+@@ -192,7 +192,9 @@ class ReportGenerator:
+     def _generate_html(self, results: Dict, output_path: str):
+         """Generate HTML report."""
+         template_content = self._get_html_template()
+-        template = Template(template_content)
++        template = Environment(
++            autoescape=select_autoescape(default_for_string=True)
++        ).from_string(template_content)
+ 
+         # Prepare data for template
+         report_data = {

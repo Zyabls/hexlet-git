@@ -80,7 +80,9 @@ cp "$script_dir/playwright-cleanup.patch" "$rootfs/tmp/playwright-cleanup.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/playwright-cleanup.patch'
 cp "$script_dir/browser-evidence.patch" "$rootfs/tmp/browser-evidence.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/browser-evidence.patch'
-rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch" "$rootfs/tmp/playwright-cleanup.patch" "$rootfs/tmp/browser-evidence.patch"
+cp "$script_dir/report-evidence.patch" "$rootfs/tmp/report-evidence.patch"
+chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/report-evidence.patch'
+rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch" "$rootfs/tmp/playwright-cleanup.patch" "$rootfs/tmp/browser-evidence.patch" "$rootfs/tmp/report-evidence.patch"
 # Keep the tested generator in this repository as the runtime source of truth,
 # so the same hotfix can also be copied into an already deployed container.
 install -m 0644 "$script_dir/ai_payload_generator.py" "$rootfs/opt/deepeye/core/ai_payload_generator.py"
@@ -180,6 +182,29 @@ find "$rootfs/tmp/deepeye-build-reports" -type f -name 'deep_eye_127.0.0.1_18082
 find "$rootfs/tmp/deepeye-build-reports" -type f -name 'deep_eye_127.0.0.1_18082_*.json' | grep -q .
 grep -Rqs '127.0.0.1:18082' "$rootfs/tmp/deepeye-build-reports"
 grep -Rqs 'Cross-Site Scripting (XSS) - Browser Verified' "$rootfs/tmp/deepeye-build-reports"
+chroot "$rootfs" /opt/deepeye/venv/bin/python - /tmp/deepeye-build-reports <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report_dir = Path(sys.argv[1])
+json_report = next(report_dir.glob('*.json'))
+html_report = next(report_dir.glob('*.html'))
+report = json.loads(json_report.read_text(encoding='utf-8'))
+findings = [
+    finding for finding in report.get('vulnerabilities', [])
+    if finding.get('type') == 'Cross-Site Scripting (XSS) - Browser Verified'
+]
+assert findings, 'browser-verified XSS finding is absent from JSON'
+finding = findings[0]
+for field in ('type', 'severity', 'url', 'parameter', 'payload', 'evidence', 'description', 'remediation'):
+    assert isinstance(finding.get(field), str) and finding[field].strip(), f'missing {field}'
+assert 'dialog' in finding['evidence'].lower(), 'evidence does not prove browser execution'
+html = html_report.read_text(encoding='utf-8')
+assert finding['evidence'] in html, 'HTML report dropped evidence'
+assert '&lt;script&gt;' in html, 'HTML report did not escape the test payload'
+assert "<script>alert('XSS')</script>" not in html, 'HTML report contains executable test payload'
+PY
 ! grep -qs 'Task was destroyed but it is pending' "$rootfs/tmp/deepeye-build-smoke.log"
 kill "$fixture_pid" >/dev/null 2>&1 || true
 wait "$fixture_pid" 2>/dev/null || true

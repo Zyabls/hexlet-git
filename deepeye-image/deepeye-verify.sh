@@ -46,6 +46,32 @@ as_admin() {
     PLAYWRIGHT_BROWSERS_PATH=/opt/deepeye/playwright "$@"
 }
 
+validate_browser_evidence() {
+  /opt/deepeye/venv/bin/python - "$1" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report_dir = Path(sys.argv[1])
+json_report = next(report_dir.glob('*.json'))
+html_report = next(report_dir.glob('*.html'))
+report = json.loads(json_report.read_text(encoding='utf-8'))
+findings = [
+    finding for finding in report.get('vulnerabilities', [])
+    if finding.get('type') == 'Cross-Site Scripting (XSS) - Browser Verified'
+]
+assert findings, 'browser-verified XSS finding is absent from JSON'
+finding = findings[0]
+for field in ('type', 'severity', 'url', 'parameter', 'payload', 'evidence', 'description', 'remediation'):
+    assert isinstance(finding.get(field), str) and finding[field].strip(), f'missing {field}'
+assert 'dialog' in finding['evidence'].lower(), 'evidence does not prove browser execution'
+html = html_report.read_text(encoding='utf-8')
+assert finding['evidence'] in html, 'HTML report dropped evidence'
+assert '&lt;script&gt;' in html, 'HTML report did not escape the test payload'
+assert "<script>alert('XSS')</script>" not in html, 'HTML report contains executable test payload'
+PY
+}
+
 echo "Deep Eye CLI-only acceptance $stamp"
 check 'Debian 13' grep -Fq 'VERSION_ID="13"' /etc/os-release
 check 'SSH active' systemctl is-active --quiet ssh.service
@@ -121,6 +147,7 @@ check 'target-named HTML report' bash -c "find '$report_dir' -type f -name '*127
 check 'target-named JSON report' bash -c "find '$report_dir' -type f -name '*127.0.0.1_18081*.json' | grep -q ."
 check 'report contains scanned resource' grep -Rqs '127.0.0.1:18081' "$report_dir"
 check 'report contains browser-verified XSS' grep -Rqs 'Cross-Site Scripting (XSS) - Browser Verified' "$report_dir"
+check 'JSON and HTML preserve complete browser evidence' validate_browser_evidence "$report_dir"
 check 'scan log has no pending Playwright task' bash -c "! grep -qs 'Task was destroyed but it is pending' '$run_dir/deepeye.log'"
 
 if (( live_llm )); then
