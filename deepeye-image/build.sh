@@ -162,7 +162,7 @@ import yaml
 source = yaml.safe_load(open('/etc/deepeye/config.yaml', encoding='utf-8'))
 source['vulnerability_scanner']['payload_generation']['use_ai'] = False
 source['vulnerability_scanner']['enabled_checks'] = ['xss']
-source['scanner'].update({'default_threads': 1, 'default_depth': 0, 'max_urls': 1, 'enable_recon': False})
+source['scanner'].update({'default_threads': 1, 'default_depth': 1, 'max_urls': 1, 'enable_recon': False})
 source['advanced'].update({'enable_javascript_rendering': True, 'screenshot_enabled': False})
 source['templates']['enabled'] = False
 source['ai_triage']['enabled'] = False
