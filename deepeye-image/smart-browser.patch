@@ -1,5 +1,5 @@
 diff --git a/modules/browser_automation/smart_tester.py b/modules/browser_automation/smart_tester.py
-index afab9d5..0d581c5 100644
+index afab9d5..12b133d 100644
 --- a/modules/browser_automation/smart_tester.py
 +++ b/modules/browser_automation/smart_tester.py
 @@ -15,11 +15,6 @@ logger = get_logger(__name__)
@@ -121,12 +121,14 @@ index afab9d5..0d581c5 100644
 +                    # Register the dialog handler before navigation: a reflected
 +                    # payload may execute while the document is being loaded.
                      dialog_detected = False
+-                    async def handle_dialog(dialog):
 +
-                     async def handle_dialog(dialog):
++                    def handle_dialog(dialog):
                          nonlocal dialog_detected
                          dialog_detected = True
                          try:
-                             await dialog.dismiss()
+-                            await dialog.dismiss()
++                            return asyncio.create_task(dialog.dismiss())
                          except Exception:
 -                            # Ignore errors if dialog is already handled or closed
 +                            # The page can close while a navigation is pending.
@@ -165,7 +167,7 @@ index afab9d5..0d581c5 100644
                              'description': 'XSS vulnerability confirmed via browser execution',
                              'remediation': 'Implement proper input validation and output encoding',
                              'screenshot': screenshot_url
-@@ -305,10 +282,8 @@ class SmartBrowserTester:
+@@ -305,21 +282,23 @@ class SmartBrowserTester:
              for payload in dom_payloads:
                  try:
                      test_url = url + payload
@@ -173,11 +175,16 @@ index afab9d5..0d581c5 100644
 -                    
 -                    # Check for dialog
                      dialog_detected = False
+-                    async def handle_dialog(dialog):
 +
-                     async def handle_dialog(dialog):
++                    def handle_dialog(dialog):
                          nonlocal dialog_detected
                          dialog_detected = True
-@@ -319,7 +294,11 @@ class SmartBrowserTester:
+                         try:
+-                            await dialog.dismiss()
++                            return asyncio.create_task(dialog.dismiss())
+                         except Exception:
+                             pass
                      
                      self.page.on('dialog', handle_dialog)
                      try:
