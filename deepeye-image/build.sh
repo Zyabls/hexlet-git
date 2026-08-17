@@ -117,7 +117,7 @@ run_as_deepadmin() {
 run_as_deepeye /opt/deepeye/venv/bin/pip install --no-cache-dir --upgrade 'pip==25.2' 'setuptools==80.9.0' 'wheel==0.45.1'
 run_as_deepeye /opt/deepeye/venv/bin/pip install --no-cache-dir -r /opt/deepeye/requirements.txt \
   'openai==1.109.1' 'pytest==8.4.2' 'openpyxl==3.1.5'
-run_as_deepeye /opt/deepeye/venv/bin/playwright install chromium
+run_as_deepeye /opt/deepeye/venv/bin/playwright install chromium > "$work_dir/playwright-install.log" 2>&1
 run_as_deepeye /opt/deepeye/venv/bin/pip freeze > "$rootfs/usr/local/share/deepeye-python-lock.txt"
 install -m 0755 "$script_dir/deepeye-cli.sh" "$rootfs/usr/local/bin/deepeye"
 
