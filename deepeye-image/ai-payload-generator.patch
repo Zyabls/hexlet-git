@@ -6,7 +6,7 @@ index 65b9f7b..2673149 100644
                  "' UnIoN SeLeCt NULL--",
                  "'/**/AND/**/SLEEP(5)--"
              ])
--        
+-
 +
 +        return list(set(payloads))[:15]
 +
@@ -25,7 +25,7 @@ index 65b9f7b..2673149 100644
              "<img src=\"x\" onerror=\"alert`1`\">",
              "<details open ontoggle=alert(1)>",
          ]
--        
+-
 +        payloads = list(default_payloads)
 +
          # Context-specific payloads
