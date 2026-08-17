@@ -77,6 +77,9 @@ chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/cli-repo
 cp "$script_dir/ai-payload-generator.patch" "$rootfs/tmp/ai-payload-generator.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/ai-payload-generator.patch'
 rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch"
+# Keep the tested generator in this repository as the runtime source of truth,
+# so the same hotfix can also be copied into an already deployed container.
+install -m 0644 "$script_dir/ai_payload_generator.py" "$rootfs/opt/deepeye/core/ai_payload_generator.py"
 
 node_archive="node-v${node_version}-linux-x64.tar.xz"
 curl --fail --location --proto '=https' --tlsv1.2 "https://nodejs.org/dist/v${node_version}/${node_archive}" -o "$downloads/$node_archive"
