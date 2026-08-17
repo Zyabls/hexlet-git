@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - artifact/deepeye-proxmox-lxc-cli-20260814
       - fix/deepeye-xss-payload-generator
     paths:
