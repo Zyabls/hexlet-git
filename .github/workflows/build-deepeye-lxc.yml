@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - artifact/deepeye-proxmox-lxc-cli-20260814
+      - fix/deepeye-xss-payload-generator
     paths:
       - deepeye-image/**
       - .github/workflows/build-deepeye-lxc.yml
@@ -102,9 +103,9 @@ jobs:
       - name: Publish immutable GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: deepeye-cli-lxc-gpt-oss-120b-20260814-r${{ github.run_number }}
+          tag_name: deepeye-cli-lxc-gpt-oss-120b-20260817-r${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: Deep Eye CLI-only Proxmox LXC 2026-08-14 (run ${{ github.run_number }})
+          name: Deep Eye CLI-only Proxmox LXC 2026-08-17 (run ${{ github.run_number }})
           body_path: deepeye-image/RELEASE_NOTES_RU.md
           prerelease: true
           files: deepeye-image/out/*

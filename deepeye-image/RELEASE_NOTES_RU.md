@@ -1,4 +1,4 @@
-# Deep Eye CLI-only Proxmox LXC — 2026-08-14
+# Deep Eye CLI-only Proxmox LXC — 2026-08-17
 
 Исправленный CLI-only образ Deep Eye 1.4.0:
 
@@ -10,6 +10,11 @@
 - `gpt-oss-120b` остаётся жёстко зафиксирован через loopback relay;
 - 17 системных команд, 17 Python imports и Chromium проходят runtime gate;
 - отчёты содержат hostname/IP цели в имени и теле.
+- Chromium проверяется реальным запуском от SSH-пользователя и browser-verified
+  XSS-проверкой на изолированном localhost fixture;
+- подтверждение XSS требует браузерного dialog, а не только отражения payload;
+- Playwright закрывает browser и connection после каждого URL, поэтому в
+  acceptance scan запрещено предупреждение о pending task.
 
 Source pin: `e98a361ee38ec65660ce585ff6789017a2d7a466`.
 Base: официальный Proxmox Debian 13.6, unprivileged LXC.

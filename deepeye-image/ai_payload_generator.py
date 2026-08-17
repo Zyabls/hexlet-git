@@ -221,7 +221,7 @@ class AIPayloadGenerator:
                 "'/**/AND/**/SLEEP(5)--"
             ])
 
-        return list(set(payloads))[:15]
+        return list(dict.fromkeys(payloads))[:15]
 
     def _generate_xss_payloads(self, context: Dict, tech_stack: List[str] = [], waf_detected: bool = False) -> List[str]:
         """Generate XSS payloads optimized for the response context.
@@ -280,7 +280,7 @@ class AIPayloadGenerator:
             "<isindex type=submit formaction=javascript:alert(1)>",
         ])
         
-        return list(set(payloads))[:15]
+        return list(dict.fromkeys(payloads))[:15]
     
     def _generate_command_injection_payloads(self, context: Dict) -> List[str]:
         """Generate command injection payloads."""

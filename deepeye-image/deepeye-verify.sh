@@ -75,20 +75,37 @@ check 'OpenAI-compatible regression' as_admin bash -c \
 check 'Chromium launches from SSH user context' as_admin /opt/deepeye/venv/bin/python -c \
   'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]); print(b.version); b.close(); p.stop()'
 
-mkdir -p "$fixture/www"
-printf '<html><title>Deep Eye CLI fixture</title><a href="/about">about</a></html>\n' > "$fixture/www/index.html"
-printf '<html><title>About</title><p>authorized local fixture</p></html>\n' > "$fixture/www/about"
-python3 -m http.server 18081 --bind 127.0.0.1 --directory "$fixture/www" > "$run_dir/fixture-http.log" 2>&1 &
+cat > "$fixture/vulnerable_fixture.py" <<'PY'
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlsplit
+
+
+class Fixture(BaseHTTPRequestHandler):
+    def do_GET(self):
+        value = parse_qs(urlsplit(self.path).query).get('q', [''])[0]
+        body = f'<!doctype html><title>Deep Eye acceptance fixture</title><main>{value}</main>'
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+    def log_message(self, *_args):
+        pass
+
+
+HTTPServer(('127.0.0.1', 18081), Fixture).serve_forever()
+PY
+python3 "$fixture/vulnerable_fixture.py" > "$run_dir/fixture-http.log" 2>&1 &
 fixture_pid=$!
-for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:18081/ >/dev/null && break; sleep 0.2; done
+for _ in $(seq 1 30); do curl -fsS 'http://127.0.0.1:18081/?q=seed' >/dev/null && break; sleep 0.2; done
 
 /opt/deepeye/venv/bin/python - /etc/deepeye/config.yaml "$run_dir/scan.yaml" "$report_dir" "$run_dir/deepeye.log" <<'PY'
 import sys, yaml
 source = yaml.safe_load(open(sys.argv[1], encoding='utf-8'))
 source['vulnerability_scanner']['payload_generation']['use_ai'] = False
-source['vulnerability_scanner']['enabled_checks'] = ['information_disclosure', 'security_misconfiguration']
-source['scanner'].update({'default_threads': 2, 'default_depth': 1, 'max_urls': 5, 'enable_recon': False})
-source['advanced'].update({'enable_javascript_rendering': False, 'screenshot_enabled': False})
+source['vulnerability_scanner']['enabled_checks'] = ['xss']
+source['scanner'].update({'default_threads': 1, 'default_depth': 0, 'max_urls': 1, 'enable_recon': False})
+source['advanced'].update({'enable_javascript_rendering': True, 'screenshot_enabled': False})
 source['templates']['enabled'] = False
 source['ai_triage']['enabled'] = False
 source['bug_bounty']['enabled'] = False
@@ -99,10 +116,12 @@ yaml.safe_dump(source, open(sys.argv[2], 'w', encoding='utf-8'), sort_keys=False
 PY
 chown deepadmin:deepeye "$run_dir/scan.yaml"
 check 'real bounded CLI scan as deepadmin' as_admin timeout 300 deepeye --no-banner \
-  --config "$run_dir/scan.yaml" --url http://127.0.0.1:18081 --formats html,json
+  --config "$run_dir/scan.yaml" --url 'http://127.0.0.1:18081/?q=seed' --formats html,json
 check 'target-named HTML report' bash -c "find '$report_dir' -type f -name '*127.0.0.1_18081*.html' | grep -q ."
 check 'target-named JSON report' bash -c "find '$report_dir' -type f -name '*127.0.0.1_18081*.json' | grep -q ."
 check 'report contains scanned resource' grep -Rqs '127.0.0.1:18081' "$report_dir"
+check 'report contains browser-verified XSS' grep -Rqs 'Cross-Site Scripting (XSS) - Browser Verified' "$report_dir"
+check 'scan log has no pending Playwright task' bash -c "! grep -qs 'Task was destroyed but it is pending' '$run_dir/deepeye.log'"
 
 if (( live_llm )); then
   check 'relay exposes gpt-oss-120b' bash -c \

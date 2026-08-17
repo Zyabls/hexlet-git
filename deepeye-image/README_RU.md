@@ -27,7 +27,7 @@ chmod 0700 ./deploy-deepeye.sh
 chmod 0600 ./gpt-oss-key.txt
 
 ./deploy-deepeye.sh \
-  ./deepeye-cli-gpt-oss-120b-debian13.6-pve-amd64-20260814.tar.zst \
+  ./deepeye-cli-gpt-oss-120b-debian13.6-pve-amd64-20260817.tar.zst \
   243 \
   --ip 192.168.1.243/24 \
   --gateway 192.168.1.1 \

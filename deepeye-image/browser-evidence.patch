@@ -1,0 +1,157 @@
+diff --git a/modules/browser_automation/smart_tester.py b/modules/browser_automation/smart_tester.py
+--- a/modules/browser_automation/smart_tester.py
++++ b/modules/browser_automation/smart_tester.py
+@@ -145,42 +145,32 @@ class SmartBrowserTester:
+                         parsed.fragment
+                     ))
+ 
+-                    # Navigate to URL
+-                    try:
+-                        await self.page.goto(test_url, wait_until='networkidle', timeout=15000)
+-                    except Exception:
+-                        # Timeout or other error, continue
+-                        pass
+-
+-                    # Check for XSS execution via console logs
+-                    console_messages = []
+-                    self.page.on('console', lambda msg: console_messages.append(msg.text))
+-
+-                    # Wait a bit for any scripts to execute
+-                    await asyncio.sleep(1)
+-
+-                    # Check if alert dialog appeared
++                    # Register the dialog handler before navigation: a reflected
++                    # payload may execute while the document is being loaded.
+                     dialog_detected = False
++
+                     async def handle_dialog(dialog):
+                         nonlocal dialog_detected
+                         dialog_detected = True
+                         try:
+                             await dialog.dismiss()
+                         except Exception:
+-                            # Ignore errors if dialog is already handled or closed
++                            # The page can close while a navigation is pending.
+                             pass
+-
++
+                     self.page.on('dialog', handle_dialog)
+                     try:
+-                        # Wait a bit for any scripts to execute
+-                        await asyncio.sleep(1)
++                        await self.page.goto(test_url, wait_until='networkidle', timeout=15000)
++                    except Exception:
++                        # A dialog can interrupt navigation; the dialog listener
++                        # above still provides the execution evidence.
++                        pass
++                    try:
++                        await asyncio.sleep(0.2)
+                     finally:
+                         self.page.remove_listener('dialog', handle_dialog)
+-
+-                    # Check page content for payload
+-                    page_content = await self.page.content()
+-
+-                    if payload in page_content or dialog_detected:
++
++                    if dialog_detected:
+                     screenshot_url = await self.take_screenshot(f"XSS_{param_name}")
+ 
+                         vulnerabilities.append({
+@@ -189,7 +179,7 @@ class SmartBrowserTester:
+                             'url': url,
+                             'parameter': param_name,
+                             'payload': payload,
+-                            'evidence': f'XSS payload executed in browser. Dialog detected: {dialog_detected}',
++                            'evidence': 'XSS payload triggered and was dismissed from a browser dialog.',
+                             'description': 'XSS vulnerability confirmed via browser execution',
+                             'remediation': 'Implement proper input validation and output encoding',
+                             'screenshot': screenshot_url
+@@ -305,10 +295,8 @@ class SmartBrowserTester:
+             for payload in dom_payloads:
+                 try:
+                     test_url = url + payload
+-                    await self.page.goto(test_url, wait_until='networkidle', timeout=10000)
+-
+-                    # Check for dialog
+                     dialog_detected = False
++
+                     async def handle_dialog(dialog):
+                         nonlocal dialog_detected
+                         dialog_detected = True
+@@ -319,6 +307,10 @@ class SmartBrowserTester:
+ 
+                     self.page.on('dialog', handle_dialog)
+                     try:
+-                        await asyncio.sleep(1)
++                        try:
++                            await self.page.goto(test_url, wait_until='networkidle', timeout=10000)
++                        except Exception:
++                            pass
++                        await asyncio.sleep(0.2)
+                     finally:
+                         self.page.remove_listener('dialog', handle_dialog)
+diff --git a/tests/test_smart_browser_tester.py b/tests/test_smart_browser_tester.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_smart_browser_tester.py
+@@ -0,0 +1,59 @@
++import asyncio
++
++from modules.browser_automation.smart_tester import SmartBrowserTester
++
++
++class _Dialog:
++    def __init__(self):
++        self.dismissed = False
++
++    async def dismiss(self):
++        self.dismissed = True
++
++
++class _Page:
++    def __init__(self, trigger_dialog):
++        self.handlers = {}
++        self.trigger_dialog = trigger_dialog
++        self.handler_registered_before_navigation = False
++
++    def on(self, event, handler):
++        self.handlers[event] = handler
++
++    def remove_listener(self, event, handler):
++        assert self.handlers[event] is handler
++        del self.handlers[event]
++
++    async def goto(self, *_args, **_kwargs):
++        self.handler_registered_before_navigation = "dialog" in self.handlers
++        if self.trigger_dialog:
++            await self.handlers["dialog"](_Dialog())
++
++
++def _run_xss_test(trigger_dialog):
++    tester = SmartBrowserTester({"advanced": {"screenshot_enabled": False}})
++    page = _Page(trigger_dialog)
++    tester.page = page
++    findings = asyncio.run(
++        tester.test_xss_browser(
++            "http://127.0.0.1:18080/?q=seed",
++            ["<script>alert('XSS')</script>"],
++        )
++    )
++    return findings, page
++
++
++def test_xss_browser_registers_dialog_listener_before_navigation():
++    findings, page = _run_xss_test(trigger_dialog=True)
++
++    assert page.handler_registered_before_navigation
++    assert len(findings) == 1
++    assert findings[0]["type"] == "Cross-Site Scripting (XSS) - Browser Verified"
++    assert "dialog" in findings[0]["evidence"].lower()
++
++
++def test_xss_browser_does_not_treat_reflection_as_execution():
++    findings, page = _run_xss_test(trigger_dialog=False)
++
++    assert page.handler_registered_before_navigation
++    assert findings == []

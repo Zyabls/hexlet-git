@@ -14,8 +14,8 @@ source_url="https://github.com/zakirkun/deep-eye/archive/${source_commit}.tar.gz
 source_sha512=030c12e99bd271513582d4739d1195fba662df48ef6c4474e0f92dd310fd228def997cbfdf89ae95a2b06e3f5e96477f0d1e225fd44572e77ef4ffc3e1df4eb5
 node_version=22.19.0
 node_sha256=c0649af18e6a24f6fe5535a3e86b341dd49a8e71117c8b68bde973ef834f16f2
-image_name=deepeye-cli-gpt-oss-120b-debian13.6-pve-amd64-20260814.tar.zst
-source_date_epoch=1784990940
+image_name=deepeye-cli-gpt-oss-120b-debian13.6-pve-amd64-20260817.tar.zst
+source_date_epoch=1786924800
 
 work_dir="$(mktemp -d -t deepeye-trixie.XXXXXXXX)"
 rootfs="$work_dir/rootfs"
@@ -78,7 +78,9 @@ cp "$script_dir/ai-payload-generator.patch" "$rootfs/tmp/ai-payload-generator.pa
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/ai-payload-generator.patch'
 cp "$script_dir/playwright-cleanup.patch" "$rootfs/tmp/playwright-cleanup.patch"
 chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -p1 --fuzz=0 < /tmp/playwright-cleanup.patch'
-rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch" "$rootfs/tmp/playwright-cleanup.patch"
+cp "$script_dir/browser-evidence.patch" "$rootfs/tmp/browser-evidence.patch"
+chroot "$rootfs" bash -lc 'cd /opt/deepeye && patch -l -p1 --fuzz=0 < /tmp/browser-evidence.patch'
+rm -f "$rootfs/tmp/openai-compatible.patch" "$rootfs/tmp/cli-report-name.patch" "$rootfs/tmp/ai-payload-generator.patch" "$rootfs/tmp/playwright-cleanup.patch" "$rootfs/tmp/browser-evidence.patch"
 # Keep the tested generator in this repository as the runtime source of truth,
 # so the same hotfix can also be copied into an already deployed container.
 install -m 0644 "$script_dir/ai_payload_generator.py" "$rootfs/opt/deepeye/core/ai_payload_generator.py"
@@ -128,22 +130,40 @@ run_as_deepeye /opt/deepeye/venv/bin/python /opt/deepeye/deep_eye.py --version
 run_as_deepeye /opt/deepeye/venv/bin/python -m py_compile \
   /opt/deepeye/deep_eye.py /opt/deepeye/ai_providers/openai_provider.py
 
-echo '[4b/9] Bounded Deep Eye CLI scan and HTML/JSON report smoke'
-mkdir -p "$work_dir/fixture-www" "$rootfs/tmp/deepeye-build-reports"
+echo '[4b/9] Browser-verified XSS acceptance scan and HTML/JSON report smoke'
+mkdir -p "$rootfs/tmp/deepeye-build-reports"
 install -d -m 0755 "$rootfs/etc/deepeye"
 install -m 0644 "$script_dir/deepeye-config.yaml" "$rootfs/etc/deepeye/config.yaml"
-printf '<html><title>Deep Eye build fixture</title><a href="/about">about</a></html>\n' > "$work_dir/fixture-www/index.html"
-printf '<html><title>About</title><p>bounded build fixture</p></html>\n' > "$work_dir/fixture-www/about"
-python3 -m http.server 18082 --bind 127.0.0.1 --directory "$work_dir/fixture-www" > "$work_dir/fixture-http.log" 2>&1 &
+cat > "$work_dir/fixture-vulnerable.py" <<'PY'
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlsplit
+
+
+class Fixture(BaseHTTPRequestHandler):
+    def do_GET(self):
+        value = parse_qs(urlsplit(self.path).query).get('q', [''])[0]
+        body = f'<!doctype html><title>Deep Eye fixture</title><main>{value}</main>'
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+    def log_message(self, *_args):
+        pass
+
+
+HTTPServer(('127.0.0.1', 18082), Fixture).serve_forever()
+PY
+python3 "$work_dir/fixture-vulnerable.py" > "$work_dir/fixture-http.log" 2>&1 &
 fixture_pid=$!
-for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:18082/ >/dev/null && break; sleep 0.2; done
+for _ in $(seq 1 30); do curl -fsS 'http://127.0.0.1:18082/?q=seed' >/dev/null && break; sleep 0.2; done
 chroot "$rootfs" /opt/deepeye/venv/bin/python - <<'PY'
 import yaml
 source = yaml.safe_load(open('/etc/deepeye/config.yaml', encoding='utf-8'))
 source['vulnerability_scanner']['payload_generation']['use_ai'] = False
-source['vulnerability_scanner']['enabled_checks'] = ['information_disclosure', 'security_misconfiguration']
-source['scanner'].update({'default_threads': 2, 'default_depth': 1, 'max_urls': 5, 'enable_recon': False})
-source['advanced'].update({'enable_javascript_rendering': False, 'screenshot_enabled': False})
+source['vulnerability_scanner']['enabled_checks'] = ['xss']
+source['scanner'].update({'default_threads': 1, 'default_depth': 0, 'max_urls': 1, 'enable_recon': False})
+source['advanced'].update({'enable_javascript_rendering': True, 'screenshot_enabled': False})
 source['templates']['enabled'] = False
 source['ai_triage']['enabled'] = False
 source['bug_bounty']['enabled'] = False
@@ -155,10 +175,12 @@ PY
 chown -R "$deep_uid:$deep_gid" "$rootfs/tmp/deepeye-build-reports" "$rootfs/tmp/deepeye-build-smoke.yaml"
 chmod 2770 "$rootfs/tmp/deepeye-build-reports"
 run_as_deepadmin timeout 300 /usr/local/bin/deepeye --no-banner \
-  --config /tmp/deepeye-build-smoke.yaml --url http://127.0.0.1:18082 --formats html,json
+  --config /tmp/deepeye-build-smoke.yaml --url 'http://127.0.0.1:18082/?q=seed' --formats html,json
 find "$rootfs/tmp/deepeye-build-reports" -type f -name 'deep_eye_127.0.0.1_18082_*.html' | grep -q .
 find "$rootfs/tmp/deepeye-build-reports" -type f -name 'deep_eye_127.0.0.1_18082_*.json' | grep -q .
 grep -Rqs '127.0.0.1:18082' "$rootfs/tmp/deepeye-build-reports"
+grep -Rqs 'Cross-Site Scripting (XSS) - Browser Verified' "$rootfs/tmp/deepeye-build-reports"
+! grep -qs 'Task was destroyed but it is pending' "$rootfs/tmp/deepeye-build-smoke.log"
 kill "$fixture_pid" >/dev/null 2>&1 || true
 wait "$fixture_pid" 2>/dev/null || true
 fixture_pid=''
