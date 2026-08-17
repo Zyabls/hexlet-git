@@ -1,0 +1,71 @@
+diff --git a/core/ai_payload_generator.py b/core/ai_payload_generator.py
+index 65b9f7b..2673149 100644
+--- a/core/ai_payload_generator.py
++++ b/core/ai_payload_generator.py
+@@ -220,7 +220,17 @@ class AIPayloadGenerator:
+                 "' UnIoN SeLeCt NULL--",
+                 "'/**/AND/**/SLEEP(5)--"
+             ])
+-        
++
++        return list(set(payloads))[:15]
++
++    def _generate_xss_payloads(self, context: Dict, tech_stack: List[str] = [], waf_detected: bool = False) -> List[str]:
++        """Generate XSS payloads optimized for the response context.
++
++        This must remain separate from the SQL generator: ``generate_payloads``
++        invokes both methods, and mixing their payload lists silently weakens SQL
++        coverage while an absent XSS method makes an AI-enabled scan fail over to
++        the generic fallback set.
++        """
+         default_payloads = [
+             "<script>alert('XSS')</script>",
+             "<img src=x onerror=alert('XSS')>",
+@@ -235,7 +245,8 @@ class AIPayloadGenerator:
+             "<img src=\"x\" onerror=\"alert`1`\">",
+             "<details open ontoggle=alert(1)>",
+         ]
+-        
++        payloads = list(default_payloads)
++
+         # Context-specific payloads
+         content_type = context.get('headers', {}).get('content-type', '').lower()
+         
+diff --git a/tests/test_ai_payload_generator.py b/tests/test_ai_payload_generator.py
+new file mode 100644
+index 0000000..0efa47b
+--- /dev/null
++++ b/tests/test_ai_payload_generator.py
+@@ -0,0 +1,32 @@
++"""Regression tests for context-aware payload generation."""
++
++from core.ai_payload_generator import AIPayloadGenerator
++
++
++class _UnusedAI:
++    def generate(self, _prompt):
++        raise AssertionError("default payload generation must not call the AI provider")
++
++
++def _generator() -> AIPayloadGenerator:
++    return AIPayloadGenerator(
++        _UnusedAI(),
++        {"vulnerability_scanner": {"payload_generation": {"use_ai": True, "cve_database": False}}},
++    )
++
++
++def test_ai_payload_generation_has_independent_sql_and_xss_generators():
++    """An AI-enabled scan must not crash when it requests its XSS payload set."""
++    payloads = _generator().generate_payloads({"url": "https://example.test/search?q=term", "headers": {}})
++
++    assert payloads["sql_injection"]
++    assert payloads["xss"]
++    assert any("<script" in payload.lower() for payload in payloads["xss"])
++    assert not any("<script" in payload.lower() for payload in payloads["sql_injection"])
++
++
++def test_default_payloads_include_xss_without_attribute_error():
++    payloads = _generator()._get_default_payloads()
++
++    assert payloads["xss"]
++    assert payloads["sql_injection"]
